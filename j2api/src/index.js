@@ -60,23 +60,24 @@ function buildBody(params) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    const origin = request.headers.get('origin');
 
     if (request.method === 'OPTIONS') {
-      return new Response(null, { status: 204, headers: corsHeaders() });
+      return new Response(null, { status: 204, headers: corsHeaders(origin) });
     }
 
     if (request.method !== 'GET' && request.method !== 'HEAD') {
-      return json({ error: 'Method not allowed. Use GET.' }, 405);
+      return json({ error: 'Method not allowed. Use GET.' }, 405, origin);
     }
 
     if (url.pathname === env.UPSTREAM_PATH) {
       return handleProxy(request, env, url);
     }
     if (url.pathname === env.CACHED_PATH) {
-      return handleCached(env, url);
+      return handleCached(env, url, origin);
     }
     if (url.pathname === '/html/jet2/hotels/getcachedhotels') {
-      return handleCachedHtml(env, url);
+      return handleCachedHtml(env, url, origin);
     }
     if (url.pathname === '/' || url.pathname === '/try') {
       return new Response(FORM_HTML, {
@@ -86,12 +87,12 @@ export default {
     if (url.pathname === '/openapi.yaml' || url.pathname === '/openapi.yml') {
       return new Response(OPENAPI_YAML, {
         headers: {
-          ...corsHeaders(),
+          ...corsHeaders(origin),
           'content-type': 'application/yaml; charset=utf-8',
         },
       });
     }
-    return json({ error: 'Not found' }, 404);
+    return json({ error: 'Not found' }, 404, origin);
   },
 };
 
@@ -213,6 +214,7 @@ const FORM_HTML = `<!doctype html>
 `;
 
 async function handleProxy(request, env, url) {
+  const origin = request.headers.get('origin');
   const body = buildBody(url.searchParams);
   const upstreamUrl = `${env.UPSTREAM_BASE}${env.UPSTREAM_PATH}`;
 
@@ -240,7 +242,7 @@ async function handleProxy(request, env, url) {
     body: JSON.stringify(body),
   });
 
-  const headers = new Headers(corsHeaders());
+  const headers = new Headers(corsHeaders(origin));
   const contentType = upstream.headers.get('content-type');
   if (contentType) headers.set('content-type', contentType);
   headers.set('x-j2api-upstream-status', String(upstream.status));
@@ -284,22 +286,22 @@ async function queryCached(env, url) {
   };
 }
 
-async function handleCached(env, url) {
+async function handleCached(env, url, origin) {
   const data = await queryCached(env, url);
   // Don't leak Page/PageSize on the JSON endpoint — keep shape identical to upstream.
   return json({
     Hotels: data.Hotels,
     HotelCountForSelectedFilters: data.HotelCountForSelectedFilters,
-  });
+  }, 200, origin);
 }
 
-async function handleCachedHtml(env, url) {
+async function handleCachedHtml(env, url, origin) {
   const data = await queryCached(env, url);
   const view = buildTeaserView(data);
   const html = Mustache.render(CARDS_TEMPLATE, view);
   return new Response(html, {
     headers: {
-      ...corsHeaders(),
+      ...corsHeaders(origin),
       'content-type': 'text/html; charset=utf-8',
     },
   });
@@ -481,21 +483,36 @@ function safeJson(text, fallback) {
   }
 }
 
-function json(payload, status = 200) {
+function json(payload, status = 200, origin) {
   return new Response(JSON.stringify(payload), {
     status,
     headers: {
-      ...corsHeaders(),
+      ...corsHeaders(origin),
       'content-type': 'application/json; charset=utf-8',
     },
   });
 }
 
-function corsHeaders() {
+// Allow the deployed AEM live/page hosts for this project, plus DA editor and
+// localhost dev. Pattern matches main--<repo>--<owner>.aem.{live,page} so
+// branch previews work too.
+const ALLOWED_ORIGIN_PATTERNS = [
+  /^https:\/\/[a-z0-9-]+--j2-da-blocks--cpilsworth\.aem\.(live|page)$/i,
+  /^https:\/\/(?:[a-z0-9-]+\.)?da\.live$/i,
+  /^http:\/\/localhost(?::\d+)?$/i,
+];
+
+function isAllowedOrigin(origin) {
+  return !!origin && ALLOWED_ORIGIN_PATTERNS.some((re) => re.test(origin));
+}
+
+function corsHeaders(origin) {
+  const allowOrigin = isAllowedOrigin(origin) ? origin : '*';
   return {
-    'access-control-allow-origin': '*',
+    'access-control-allow-origin': allowOrigin,
     'access-control-allow-methods': 'GET, HEAD, OPTIONS',
     'access-control-allow-headers':
       'content-type, x-forwarded-cookie, x-forwarded-user-agent',
+    vary: 'Origin',
   };
 }
