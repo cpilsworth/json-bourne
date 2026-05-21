@@ -10,6 +10,52 @@ import jsYaml from 'https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/+esm';
 const DEFAULT_API_BASE = 'https://j2api.cpilsworth.workers.dev';
 const STORAGE_KEY = 'hotel-url-builder:apiBase';
 
+// Static option lists for IDs that aren't enumerated in the OpenAPI schema.
+// Resort IDs come from the Algarve hotel set Jet2's getfilteredhotels returns
+// for /destinations/portugal — i.e. the universe of IDs the cached D1
+// snapshot knows about. Sorted alphabetically by resort name.
+const RESORT_OPTIONS = [
+  { id: 573, label: 'Albufeira' },
+  { id: 577, label: 'Alvor' },
+  { id: 578, label: 'Armação de Pêra' },
+  { id: 2153, label: 'Bordeira' },
+  { id: 579, label: 'Carvoeiro' },
+  { id: 2245, label: 'Castelo (Albufeira)' },
+  { id: 1624, label: 'Estoi' },
+  { id: 2046, label: 'Faro' },
+  { id: 1835, label: 'Ferragudo' },
+  { id: 2246, label: 'Galé (Albufeira)' },
+  { id: 2247, label: 'Guia (Albufeira)' },
+  { id: 580, label: 'Lagos' },
+  { id: 581, label: 'Loulé' },
+  { id: 1846, label: 'Moncarapacho' },
+  { id: 582, label: 'Monte Gordo' },
+  { id: 1306, label: 'Olhão' },
+  { id: 583, label: "Olhos d'Água (Albufeira)" },
+  { id: 586, label: 'Praia da Rocha' },
+  { id: 1291, label: 'Praia do Vau' },
+  { id: 2129, label: 'Praia Verde' },
+  { id: 587, label: 'Quarteira' },
+  { id: 588, label: 'Quinta do Lago' },
+  { id: 1590, label: 'Salema' },
+  { id: 2248, label: 'São Rafael (Albufeira)' },
+  { id: 589, label: 'Silves' },
+  { id: 590, label: 'Tavira' },
+  { id: 2249, label: 'Vale de Parra (Albufeira)' },
+  { id: 2093, label: 'Vila Nova de Cacela' },
+  { id: 592, label: 'Vilamoura' },
+];
+
+const AREA_OPTIONS = [
+  { id: 'Algarve', label: 'Algarve' },
+];
+
+const STATIC_OPTIONS = {
+  resorts: RESORT_OPTIONS,
+  predefinedResorts: RESORT_OPTIONS,
+  areas: AREA_OPTIONS,
+};
+
 const $ = (sel, root = document) => root.querySelector(sel);
 
 function el(tag, attrs = {}, children = []) {
@@ -96,6 +142,15 @@ function fieldFor(p) {
       if (def != null && String(v) === String(def)) opt.selected = true;
       control.append(opt);
     }
+  } else if (kind === 'array' && STATIC_OPTIONS[p.name]) {
+    const opts = STATIC_OPTIONS[p.name];
+    control = el('select', {
+      id, name: p.name, multiple: 'multiple', size: Math.min(opts.length, 8),
+    });
+    control.dataset.kind = 'multi';
+    for (const opt of opts) {
+      control.append(el('option', { value: String(opt.id) }, opt.label));
+    }
   } else if (kind === 'array') {
     const long = (p.schema?.items?.type === 'integer') && p.name === 'predefinedResorts';
     control = el(long ? 'textarea' : 'input', { id, name: p.name, placeholder: 'comma-separated' });
@@ -144,6 +199,10 @@ function collectValues(form) {
     }
     if (kind === 'boolean') {
       if (control.checked) out.set(name, 'true');
+      continue;
+    }
+    if (kind === 'multi') {
+      for (const opt of control.selectedOptions) out.append(name, opt.value);
       continue;
     }
     const raw = control.value?.trim();
