@@ -1,3 +1,67 @@
+.accommodation-teaser.block {
+  /* Design-system token defaults — overridden by the host site if it defines them. */
+  --color-white-base: #fff;
+  --color-stone-dark: #e0e0e0;
+  --color-slate-dark: #131313;
+  --color-slate-base: #585858;
+  --color-theme-base: #f0f0f0;
+  --color-blue-base: #1e3a8a;
+  --color-blue-base-hover: #1e3a8a;
+  --color-blue-base-active: #0f1e4a;
+  --color-red-base: #e0245e;
+  --text-secondary-color: #585858;
+  --heading-default-text-color: #131313;
+  --icon-color-info: #2563eb;
+  --radius-200: 6px;
+  --radius-400: 12px;
+  --spacing-xs: 4px;
+  --spacing-sm: 8px;
+  --spacing-md: 12px;
+  --spacing-lg: 16px;
+  --spacing-xl: 20px;
+  --spacing-2xl: 24px;
+  --icon-size-sm: 16px;
+  --icon-size-md: 24px;
+  --heading-title-md-text: 600 24px/1.25 var(--body-font-family, sans-serif);
+  --heading-title-lg-text: 600 32px/1.2 var(--body-font-family, sans-serif);
+  --text-regular-sm: 400 14px/1.4 var(--body-font-family, sans-serif);
+  --text-regular-md: 400 16px/1.5 var(--body-font-family, sans-serif);
+  --text-semibold-sm: 600 14px/1.4 var(--body-font-family, sans-serif);
+  --text-semibold-md: 600 16px/1.4 var(--body-font-family, sans-serif);
+  --text-semibold-xl: 600 20px/1.3 var(--body-font-family, sans-serif);
+  --badge-base-padding: 4px 8px;
+  --badge-base-border-radius: 6px;
+  --badge-md-text: 600 13px/1.2 var(--body-font-family, sans-serif);
+  --button-base-border: 1px solid;
+  --button-base-border-radius: 999px;
+  --button-base-focus-color: #2563eb;
+  --button-md-padding: 10px 20px;
+  --button-md-gap: 8px;
+  --button-md-text: 600 16px/1.2 var(--body-font-family, sans-serif);
+  --button-icon-only-base-border-radius: 999px;
+  --button-icon-only-sm-padding: 6px;
+  --button-icon-only-md-padding: 8px;
+  --button-secondary-default-background-color: #fff;
+  --button-secondary-default-border-color: #131313;
+  --button-secondary-default-text-color: #131313;
+  --button-secondary-hover-background-color: #131313;
+  --button-secondary-hover-text-color: #fff;
+  --button-secondary-active-background-color: #131313;
+  --button-secondary-active-text-color: #fff;
+  --button-link-secondary-default-text-color: #131313;
+  --button-link-secondary-hover-background-color: transparent;
+  --button-link-secondary-hover-text-color: #131313;
+  --button-link-secondary-active-background-color: transparent;
+  --button-link-secondary-active-text-color: #131313;
+  --tooltip-base-border: 1px solid;
+  --tooltip-base-border-color: #e0e0e0;
+  --tooltip-base-background-color: #fff;
+  --tooltip-base-padding: 16px;
+  --tooltip-base-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --tooltip-base-text: 400 14px/1.5 var(--body-font-family, sans-serif);
+  --tooltip-base-text-color: #131313;
+}
+
 .accommodation-teaser.block:not(:has(.cards)) {
   display: none;
 }
