@@ -7,7 +7,7 @@ import DA_SDK from 'https://da.live/nx/utils/sdk.js';
 // eslint-disable-next-line import/no-unresolved
 import jsYaml from 'https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/+esm';
 
-const DEFAULT_API_BASE = 'https://j2api.adobeaem.workers.dev';
+const DEFAULT_API_BASE = 'https://j2api.cpilsworth.workers.dev';
 const STORAGE_KEY = 'hotel-url-builder:apiBase';
 
 const $ = (sel, root = document) => root.querySelector(sel);
