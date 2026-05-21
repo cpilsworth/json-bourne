@@ -11,69 +11,136 @@ const DEFAULT_API_BASE = 'https://j2api.cpilsworth.workers.dev';
 const STORAGE_KEY = 'hotel-url-builder:apiBase';
 
 // Static option lists for IDs that aren't enumerated in the OpenAPI schema.
-// Resort IDs come from the Algarve hotel set Jet2's getfilteredhotels returns
-// for /destinations/portugal — i.e. the universe of IDs the cached D1
-// snapshot knows about. Sorted alphabetically by resort name.
+// All values lifted from the live Jet2holidays /destinations/portugal filter
+// dialog (board-basis_*, room-type_*, location_*, our-rating_* inputs).
+//
+// A grouped list is rendered with <optgroup>; a flat list is rendered as
+// plain <option>s.
 const RESORT_OPTIONS = [
-  { id: 573, label: 'Albufeira' },
-  { id: 577, label: 'Alvor' },
-  { id: 578, label: 'Armação de Pêra' },
-  { id: 2153, label: 'Bordeira' },
-  { id: 579, label: 'Carvoeiro' },
-  { id: 2245, label: 'Castelo (Albufeira)' },
-  { id: 1624, label: 'Estoi' },
-  { id: 2046, label: 'Faro' },
-  { id: 1835, label: 'Ferragudo' },
-  { id: 2246, label: 'Galé (Albufeira)' },
-  { id: 2247, label: 'Guia (Albufeira)' },
-  { id: 580, label: 'Lagos' },
-  { id: 581, label: 'Loulé' },
-  { id: 1846, label: 'Moncarapacho' },
-  { id: 582, label: 'Monte Gordo' },
-  { id: 1306, label: 'Olhão' },
-  { id: 583, label: "Olhos d'Água (Albufeira)" },
-  { id: 586, label: 'Praia da Rocha' },
-  { id: 1291, label: 'Praia do Vau' },
-  { id: 2129, label: 'Praia Verde' },
-  { id: 587, label: 'Quarteira' },
-  { id: 588, label: 'Quinta do Lago' },
-  { id: 1590, label: 'Salema' },
-  { id: 2248, label: 'São Rafael (Albufeira)' },
-  { id: 589, label: 'Silves' },
-  { id: 590, label: 'Tavira' },
-  { id: 2249, label: 'Vale de Parra (Albufeira)' },
-  { id: 2093, label: 'Vila Nova de Cacela' },
-  { id: 592, label: 'Vilamoura' },
+  {
+    group: 'Algarve',
+    options: [
+      { id: 573, label: 'Albufeira' },
+      { id: 575, label: 'Almancil' },
+      { id: 577, label: 'Alvor' },
+      { id: 578, label: 'Armação de Pêra' },
+      { id: 2153, label: 'Bordeira' },
+      { id: 579, label: 'Carvoeiro' },
+      { id: 2245, label: 'Castelo (Albufeira)' },
+      { id: 1845, label: 'Castro Marim' },
+      { id: 1624, label: 'Estoi' },
+      { id: 2046, label: 'Faro' },
+      { id: 1835, label: 'Ferragudo' },
+      { id: 2246, label: 'Galé (Albufeira)' },
+      { id: 2247, label: 'Guia (Albufeira)' },
+      { id: 580, label: 'Lagos' },
+      { id: 581, label: 'Loulé' },
+      { id: 1846, label: 'Moncarapacho' },
+      { id: 1621, label: 'Monchique' },
+      { id: 582, label: 'Monte Gordo' },
+      { id: 1306, label: 'Olhão' },
+      { id: 583, label: 'Olhos d’Água (Albufeira)' },
+      { id: 586, label: 'Praia da Rocha' },
+      { id: 1291, label: 'Praia do Vau' },
+      { id: 2129, label: 'Praia Verde' },
+      { id: 587, label: 'Quarteira' },
+      { id: 588, label: 'Quinta do Lago' },
+      { id: 1590, label: 'Salema' },
+      { id: 1879, label: 'São Brás' },
+      { id: 2248, label: 'São Rafael (Albufeira)' },
+      { id: 589, label: 'Silves' },
+      { id: 590, label: 'Tavira' },
+      { id: 2249, label: 'Vale de Parra (Albufeira)' },
+      { id: 2093, label: 'Vila Nova de Cacela' },
+      { id: 592, label: 'Vilamoura' },
+    ],
+  },
+  {
+    group: 'Costa Verde',
+    options: [
+      { id: 2195, label: 'Barcelos' },
+      { id: 2192, label: 'Caminha' },
+      { id: 2194, label: 'Esposende' },
+      { id: 2193, label: 'Paredes de Coura' },
+      { id: 2197, label: 'Ponte de Lima' },
+      { id: 2196, label: 'Viana do Castelo' },
+    ],
+  },
+  {
+    group: 'Madeira',
+    options: [
+      { id: 1357, label: 'Calheta' },
+      { id: 1954, label: 'Câmara de Lobos' },
+      { id: 1400, label: 'Caniçal' },
+      { id: 534, label: 'Caniço' },
+      { id: 535, label: 'Funchal' },
+      { id: 537, label: 'Machico' },
+      { id: 2023, label: 'Madalena do Mar' },
+      { id: 1673, label: 'Ponta do Sol' },
+      { id: 2186, label: 'Porto Moniz' },
+      { id: 1880, label: 'Prazeres' },
+      { id: 539, label: 'Ribeira Brava' },
+      { id: 1330, label: 'Santa Cruz (Madeira)' },
+      { id: 1723, label: 'Santana' },
+      { id: 540, label: 'Santo da Serra' },
+      { id: 1724, label: 'São Vicente' },
+    ],
+  },
 ];
 
+// The cached endpoint matches `areas` against the hotel's area NAME (string),
+// so values are the names not the upstream numeric IDs (139/2191/129).
 const AREA_OPTIONS = [
   { id: 'Algarve', label: 'Algarve' },
+  { id: 'Costa Verde', label: 'Costa Verde' },
+  { id: 'Madeira', label: 'Madeira' },
 ];
 
-// Board basis and room type IDs are platform-specific to Jet2 and aren't
-// captured in the cached seed (the scrape script sends empty arrays). Populate
-// these from the live filter UI on jet2holidays.com when available — the
-// proxy endpoint will pass the IDs through to upstream. The cached endpoint
-// ignores these filters (see openapi.yaml description).
 const BOARD_BASIS_OPTIONS = [
-  // TODO: { id: <number>, label: 'All Inclusive' },
-  // TODO: { id: <number>, label: 'Half Board' },
-  // …
+  { id: 5, label: 'All Inclusive' },
+  { id: 8, label: 'All Inclusive Plus' },
+  { id: 1, label: 'Bed & Breakfast' },
+  { id: 3, label: 'Full Board' },
+  { id: 11, label: 'Full Board Plus' },
+  { id: 2, label: 'Half Board' },
+  { id: 10, label: 'Half Board Plus' },
+  { id: 6, label: 'Room Only' },
+  { id: 4, label: 'Self Catering' },
 ];
 
 const ROOM_TYPE_OPTIONS = [
-  // TODO: { id: <number>, label: 'Standard Room' },
-  // …
+  { id: 22, label: '1 Bedroom Suite' },
+  { id: 21, label: '2 Bedroom Suite' },
+  { id: 2, label: 'Double' },
+  { id: 13, label: 'Double/Twin' },
+  { id: 4, label: 'Family Room' },
+  { id: 23, label: 'Interconnecting Room' },
+  { id: 19, label: 'Junior Suite' },
+  { id: 5, label: 'One Bed Apt' },
+  { id: 20, label: 'Quad' },
+  { id: 1, label: 'Single' },
+  { id: 8, label: 'Studio' },
+  { id: 15, label: 'Superior' },
+  { id: 17, label: 'Townhouse' },
+  { id: 7, label: 'Triple' },
+  { id: 6, label: 'Two Bed Apt' },
+  { id: 16, label: 'Villa' },
+];
+
+const STAR_RATING_OPTIONS = [
+  { id: 2, label: '2 stars' },
+  { id: 3, label: '3 stars' },
+  { id: 4, label: '4 stars' },
+  { id: 5, label: '5 stars' },
 ];
 
 const STATIC_OPTIONS = {
   resorts: RESORT_OPTIONS,
   predefinedResorts: RESORT_OPTIONS,
   areas: AREA_OPTIONS,
-  // Only swap in the multi-select once the option lists are populated;
-  // otherwise the user can't type a value at all.
-  ...(BOARD_BASIS_OPTIONS.length ? { boardBasisIds: BOARD_BASIS_OPTIONS } : {}),
-  ...(ROOM_TYPE_OPTIONS.length ? { roomTypeIds: ROOM_TYPE_OPTIONS } : {}),
+  boardBasisIds: BOARD_BASIS_OPTIONS,
+  roomTypeIds: ROOM_TYPE_OPTIONS,
+  starRatings: STAR_RATING_OPTIONS,
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -162,14 +229,21 @@ function fieldFor(p) {
       if (def != null && String(v) === String(def)) opt.selected = true;
       control.append(opt);
     }
-  } else if (kind === 'array' && STATIC_OPTIONS[p.name]) {
+  } else if ((kind === 'array' || kind === 'enum') && STATIC_OPTIONS[p.name]) {
     const opts = STATIC_OPTIONS[p.name];
+    const flat = opts.flatMap((o) => (o.group ? o.options : [o]));
     control = el('select', {
-      id, name: p.name, multiple: 'multiple', size: Math.min(opts.length, 8),
+      id, name: p.name, multiple: 'multiple', size: Math.min(flat.length, 10),
     });
     control.dataset.kind = 'multi';
-    for (const opt of opts) {
-      control.append(el('option', { value: String(opt.id) }, opt.label));
+    for (const o of opts) {
+      if (o.group) {
+        const og = el('optgroup', { label: o.group });
+        for (const sub of o.options) og.append(el('option', { value: String(sub.id) }, sub.label));
+        control.append(og);
+      } else {
+        control.append(el('option', { value: String(o.id) }, o.label));
+      }
     }
   } else if (kind === 'array') {
     const long = (p.schema?.items?.type === 'integer') && p.name === 'predefinedResorts';
