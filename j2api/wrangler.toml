@@ -1,6 +1,6 @@
 name = "j2api"
 main = "src/index.js"
-compatibility_date = "2026-05-21"
+compatibility_date = "2026-05-14"
 
 # The worker serves UPSTREAM_PATH and proxies to UPSTREAM_BASE + UPSTREAM_PATH,
 # so a route swap can replace the original endpoint without changing callers.
@@ -13,6 +13,11 @@ compatibility_date = "2026-05-21"
 UPSTREAM_BASE = "https://www.jet2holidays.com"
 UPSTREAM_PATH = "/api/jet2/hotels/getfilteredhotels"
 CACHED_PATH = "/api/jet2/hotels/getcachedhotels"
+
+[[rules]]
+type = "Text"
+globs = ["**/*.yaml"]
+fallthrough = true
 
 [[d1_databases]]
 binding = "DB"

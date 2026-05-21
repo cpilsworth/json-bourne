@@ -4,6 +4,7 @@
 //   GET /html/jet2/hotels/getcachedhotels   → same as cached, but rendered to HTML
 
 import Mustache from 'mustache';
+import OPENAPI_YAML from '../openapi.yaml';
 
 // Default Mustache escape encodes "/" as "&#x2F;" which mangles URLs in href/src.
 // Override to keep the XSS-relevant escapes and leave "/" alone.
@@ -80,6 +81,14 @@ export default {
     if (url.pathname === '/' || url.pathname === '/try') {
       return new Response(FORM_HTML, {
         headers: { 'content-type': 'text/html; charset=utf-8' },
+      });
+    }
+    if (url.pathname === '/openapi.yaml' || url.pathname === '/openapi.yml') {
+      return new Response(OPENAPI_YAML, {
+        headers: {
+          ...corsHeaders(),
+          'content-type': 'application/yaml; charset=utf-8',
+        },
       });
     }
     return json({ error: 'Not found' }, 404);

@@ -1,0 +1,305 @@
+openapi: 3.1.0
+info:
+  title: j2api
+  version: 1.0.0
+  description: |
+    Cloudflare Worker that fronts Jet2holidays' hotel-search endpoint.
+
+    Three hotel endpoints are exposed:
+
+      * `GET /api/jet2/hotels/getfilteredhotels` — proxies live to Jet2holidays
+        (a `POST` upstream is built from the query string).
+      * `GET /api/jet2/hotels/getcachedhotels`   — answers from the local D1
+        cache. Same JSON shape as upstream (minus `Page`/`PageSize`).
+      * `GET /html/jet2/hotels/getcachedhotels`  — same data as cached, but
+        server-rendered into an `accommodation-teaser` HTML fragment.
+
+    All array parameters accept either repeated keys (`?areas=A&areas=B`) or
+    comma-separated values (`?areas=A,B`). All parameters are optional.
+
+servers:
+  - url: https://j2api.example.workers.dev
+    description: Cloudflare Worker (replace host with the deployed route)
+
+paths:
+  /api/jet2/hotels/getfilteredhotels:
+    get:
+      operationId: getFilteredHotels
+      summary: Proxy to Jet2holidays' live hotel-filter endpoint
+      description: |
+        Builds a POST body from the query string and forwards it to
+        `${UPSTREAM_BASE}/api/jet2/hotels/getfilteredhotels`. The upstream
+        response body, status, and `content-type` are passed through; the
+        upstream HTTP status is also echoed in `x-j2api-upstream-status`.
+      parameters:
+        - $ref: '#/components/parameters/Areas'
+        - $ref: '#/components/parameters/BoardBasisIds'
+        - $ref: '#/components/parameters/RoomTypeIds'
+        - $ref: '#/components/parameters/StarRatings'
+        - $ref: '#/components/parameters/Resorts'
+        - $ref: '#/components/parameters/PredefinedResorts'
+        - $ref: '#/components/parameters/HotelOrder'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/ShowVillasOnly'
+        - $ref: '#/components/parameters/ForwardedCookie'
+        - $ref: '#/components/parameters/ForwardedUserAgent'
+      responses:
+        '200':
+          description: Upstream Jet2holidays response, passed through.
+          headers:
+            x-j2api-upstream-status:
+              schema: { type: string }
+              description: Numeric HTTP status returned by the upstream call.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UpstreamHotelsResponse'
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+  /api/jet2/hotels/getcachedhotels:
+    get:
+      operationId: getCachedHotels
+      summary: Hotels from the local D1 cache (JSON)
+      description: |
+        Returns the same JSON shape as the upstream endpoint, sourced from the
+        D1 cache. `Page` and `PageSize` are intentionally omitted from the
+        response to keep the shape identical to upstream.
+
+        `boardBasisIds` and `roomTypeIds` are accepted but ignored on this
+        path — they are booking-time attributes that aren't stored on the
+        cached hotel record.
+      parameters:
+        - $ref: '#/components/parameters/Areas'
+        - $ref: '#/components/parameters/BoardBasisIds'
+        - $ref: '#/components/parameters/RoomTypeIds'
+        - $ref: '#/components/parameters/StarRatings'
+        - $ref: '#/components/parameters/Resorts'
+        - $ref: '#/components/parameters/PredefinedResorts'
+        - $ref: '#/components/parameters/HotelOrder'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/ShowVillasOnly'
+      responses:
+        '200':
+          description: Cached hotels matching the filter.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CachedHotelsResponse'
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+  /html/jet2/hotels/getcachedhotels:
+    get:
+      operationId: getCachedHotelsHtml
+      summary: Hotels from the local D1 cache (rendered HTML fragment)
+      description: |
+        Same data as `/api/jet2/hotels/getcachedhotels`, but server-rendered
+        with Mustache into an `accommodation-teaser` block fragment. The
+        fragment is self-contained (inlined SVG icons, no sprite required)
+        and intended to be injected into an AEM/EDS host page.
+      parameters:
+        - $ref: '#/components/parameters/Areas'
+        - $ref: '#/components/parameters/BoardBasisIds'
+        - $ref: '#/components/parameters/RoomTypeIds'
+        - $ref: '#/components/parameters/StarRatings'
+        - $ref: '#/components/parameters/Resorts'
+        - $ref: '#/components/parameters/PredefinedResorts'
+        - $ref: '#/components/parameters/HotelOrder'
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/PageSize'
+        - $ref: '#/components/parameters/ShowVillasOnly'
+      responses:
+        '200':
+          description: HTML fragment for the `accommodation-teaser` block.
+          content:
+            text/html:
+              schema:
+                type: string
+              example: |
+                <div class="accommodation-teaser block" data-block-name="accommodation-teaser" data-block-status="initialized">
+                  <h2>Hotels in Algarve</h2>
+                  <ul class="cards">…</ul>
+                  <a href="?category=all#tabs%7Cmain:accommodation" class="button">Show all (42) and filter options</a>
+                </div>
+        '405': { $ref: '#/components/responses/MethodNotAllowed' }
+
+components:
+  parameters:
+    Areas:
+      name: areas
+      in: query
+      description: Area names (e.g. `Algarve`). CSV or repeated.
+      required: false
+      schema: { type: array, items: { type: string } }
+      style: form
+      explode: true
+    BoardBasisIds:
+      name: boardBasisIds
+      in: query
+      description: Board-basis IDs. Used only by the proxy path.
+      required: false
+      schema: { type: array, items: { type: string } }
+      style: form
+      explode: true
+    RoomTypeIds:
+      name: roomTypeIds
+      in: query
+      description: Room-type IDs. Used only by the proxy path.
+      required: false
+      schema: { type: array, items: { type: string } }
+      style: form
+      explode: true
+    StarRatings:
+      name: starRatings
+      in: query
+      description: Star ratings to include (e.g. `4,5`).
+      required: false
+      schema:
+        type: array
+        items: { type: number, format: float }
+      style: form
+      explode: true
+    Resorts:
+      name: resorts
+      in: query
+      description: Resort IDs.
+      required: false
+      schema: { type: array, items: { type: integer } }
+      style: form
+      explode: true
+    PredefinedResorts:
+      name: predefinedResorts
+      in: query
+      description: |
+        Resort IDs from a predefined list (typically supplied by the host page).
+        Combined with `resorts` for filtering.
+      required: false
+      schema: { type: array, items: { type: integer } }
+      style: form
+      explode: true
+    HotelOrder:
+      name: hotelOrder
+      in: query
+      description: |
+        Sort order:
+        * `1` — Recommended (default)
+        * `2` — Our rating high→low
+        * `3` — Our rating low→high
+        * `4` — TripAdvisor rating
+      required: false
+      schema:
+        type: string
+        enum: ['1', '2', '3', '4']
+        default: '1'
+    Page:
+      name: page
+      in: query
+      description: Zero-based page index.
+      required: false
+      schema: { type: integer, minimum: 0, default: 0 }
+    PageSize:
+      name: pageSize
+      in: query
+      description: Page size for the cached endpoints. Clamped to `[1, 200]`.
+      required: false
+      schema: { type: integer, minimum: 1, maximum: 200, default: 10 }
+    ShowVillasOnly:
+      name: showVillasOnly
+      in: query
+      description: Filter to villas only. Truthy values (`true`/`1`/`yes`) map to `True`.
+      required: false
+      schema:
+        type: string
+        enum: [ 'True', 'False', 'true', 'false', '1', '0', 'yes', 'no' ]
+        default: 'False'
+    ForwardedCookie:
+      name: x-forwarded-cookie
+      in: header
+      description: |
+        Cookie header forwarded to the upstream Jet2holidays call. Browsers
+        forbid setting `Cookie` directly on `fetch()`, so this header is used
+        as a pass-through. Proxy path only.
+      required: false
+      schema: { type: string }
+    ForwardedUserAgent:
+      name: x-forwarded-user-agent
+      in: header
+      description: User-Agent forwarded to the upstream. Proxy path only.
+      required: false
+      schema: { type: string }
+
+  responses:
+    MethodNotAllowed:
+      description: Only `GET`, `HEAD`, and `OPTIONS` are accepted.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+          example: { error: 'Method not allowed. Use GET.' }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+      required: [error]
+
+    Hotel:
+      type: object
+      properties:
+        Id: { type: integer }
+        Name: { type: string }
+        Image:
+          type: string
+          format: uri
+          description: |
+            Base image URL. Append `?wid=…&hei=…&qlt=60&fit=wrap` for sized variants.
+        Url: { type: string, format: uri }
+        Resort: { type: string }
+        Area: { type: string }
+        Region: { type: string }
+        Brand: { type: string }
+        BrandId: { type: integer }
+        StarRating:
+          type: string
+          description: Star rating as a string (e.g. `"4"`, `"4.5"`).
+        KeySellingPoints:
+          type: array
+          items: { type: string }
+        VillaFeatures:
+          type: array
+          items: { type: string }
+        Rating:
+          type: object
+          properties:
+            RatingValue: { type: string }
+            RatingImageUrl: { type: string, format: uri }
+            NumberOfReviews: { type: integer }
+            Jet2HotelId: { type: integer }
+            Awards:
+              type: array
+              items: { type: object, additionalProperties: true }
+            Jet2Awards:
+              type: array
+              items: { type: object, additionalProperties: true }
+        ReviewCount: { type: integer }
+        IsVilla: { type: boolean }
+
+    CachedHotelsResponse:
+      type: object
+      properties:
+        Hotels:
+          type: array
+          items: { $ref: '#/components/schemas/Hotel' }
+        HotelCountForSelectedFilters:
+          type: integer
+          description: Total hotels matching the filter (before pagination).
+      required: [Hotels, HotelCountForSelectedFilters]
+
+    UpstreamHotelsResponse:
+      description: |
+        Pass-through of the upstream Jet2holidays response. The shape matches
+        `CachedHotelsResponse` but additional upstream fields may be present.
+      allOf:
+        - $ref: '#/components/schemas/CachedHotelsResponse'
+      type: object
+      additionalProperties: true
