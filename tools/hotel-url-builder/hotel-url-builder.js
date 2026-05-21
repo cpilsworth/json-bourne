@@ -42,6 +42,14 @@ function paramsFromSpec(spec) {
     .filter((p) => p && p.in === 'query');
 }
 
+// `showVillasOnly` and friends declare an enum of true/false-ish strings —
+// detect that so we can render a checkbox instead of a long dropdown.
+function isBooleanEnum(p) {
+  const e = p.schema?.enum;
+  if (!Array.isArray(e) || e.length === 0) return false;
+  return e.every((v) => /^(true|false|0|1|yes|no)$/i.test(String(v)));
+}
+
 function paramKind(p) {
   const s = p.schema || {};
   if (s.type === 'array') return 'array';
@@ -58,10 +66,12 @@ function fieldFor(p) {
   const isWide = p.name === 'predefinedResorts' || p.name === 'resorts';
   const fs = el('fieldset', { class: isWide ? 'wide' : '' });
 
-  if (kind === 'boolean' || (kind === 'enum' && p.schema.enum?.length === 2)) {
+  // Treat boolean-shaped params (true/False enums or explicit booleans) as
+  // checkboxes that emit a literal `true` or `false` value.
+  if (kind === 'boolean' || isBooleanEnum(p)) {
     const wrap = el('fieldset', { class: 'row-checkbox' });
-    const cb = el('input', { type: 'checkbox', id, name: p.name, value: 'true' });
-    cb.dataset.kind = 'boolean';
+    const cb = el('input', { type: 'checkbox', id, name: p.name });
+    cb.dataset.kind = 'tri-bool';
     wrap.append(cb, el('label', { for: id }, p.name));
     return wrap;
   }
@@ -75,10 +85,16 @@ function fieldFor(p) {
   if (kind === 'enum') {
     control = el('select', { id, name: p.name });
     control.dataset.kind = 'enum';
-    // Allow empty (= use server default).
-    control.append(el('option', { value: '' }, `(default${p.schema.default ? `: ${p.schema.default}` : ''})`));
+    const def = p.schema.default;
+    // Skip the "(default)" placeholder when the schema names a real default —
+    // we'll just pre-select it so the URL always includes a value.
+    if (def == null) {
+      control.append(el('option', { value: '' }, '(default)'));
+    }
     for (const v of p.schema.enum) {
-      control.append(el('option', { value: v }, enumLabel(p.name, v)));
+      const opt = el('option', { value: v }, enumLabel(p.name, v));
+      if (def != null && String(v) === String(def)) opt.selected = true;
+      control.append(opt);
     }
   } else if (kind === 'array') {
     const long = (p.schema?.items?.type === 'integer') && p.name === 'predefinedResorts';
@@ -122,6 +138,10 @@ function collectValues(form) {
   for (const control of form.querySelectorAll('[name]')) {
     const { name } = control;
     const kind = control.dataset.kind;
+    if (kind === 'tri-bool') {
+      out.set(name, control.checked ? 'true' : 'false');
+      continue;
+    }
     if (kind === 'boolean') {
       if (control.checked) out.set(name, 'true');
       continue;
@@ -184,11 +204,6 @@ function render(spec, apiBase, context) {
     el('div', { class: 'ctx' }, context?.org && context?.repo ? `${context.org}/${context.repo}` : ''),
   ]);
 
-  const baseRow = el('div', { class: 'api-base' }, [
-    el('label', { for: 'api-base' }, 'API base'),
-    el('input', { id: 'api-base', type: 'url', value: apiBase }),
-  ]);
-
   const form = el('form', { id: 'filters' });
   const params = paramsFromSpec(spec);
   for (const p of params) form.append(fieldFor(p));
@@ -211,11 +226,10 @@ function render(spec, apiBase, context) {
     ]),
   ]);
 
-  root.append(header, baseRow, form, footer);
+  root.append(header, form, footer);
 
   function refresh() {
-    const base = $('#api-base').value.trim().replace(/\/$/, '') || apiBase;
-    const urls = buildUrls(base, collectValues(form));
+    const urls = buildUrls(apiBase, collectValues(form));
     urlJson.textContent = urls.json;
     urlHtml.textContent = urls.html;
     urlJson.dataset.url = urls.json;
@@ -224,10 +238,6 @@ function render(spec, apiBase, context) {
 
   form.addEventListener('input', refresh);
   form.addEventListener('change', refresh);
-  $('#api-base').addEventListener('input', () => {
-    localStorage.setItem(STORAGE_KEY, $('#api-base').value);
-    refresh();
-  });
 
   $('#copy-json').addEventListener('click', () => copy(urlJson.dataset.url));
   $('#copy-html').addEventListener('click', () => copy(urlHtml.dataset.url));
