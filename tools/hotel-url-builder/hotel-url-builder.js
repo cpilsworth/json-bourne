@@ -10,138 +10,22 @@ import jsYaml from 'https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/+esm';
 const DEFAULT_API_BASE = 'https://j2api.cpilsworth.workers.dev';
 const STORAGE_KEY = 'hotel-url-builder:apiBase';
 
-// Static option lists for IDs that aren't enumerated in the OpenAPI schema.
-// All values lifted from the live Jet2holidays /destinations/portugal filter
-// dialog (board-basis_*, room-type_*, location_*, our-rating_* inputs).
-//
-// A grouped list is rendered with <optgroup>; a flat list is rendered as
-// plain <option>s.
-const RESORT_OPTIONS = [
-  {
-    group: 'Algarve',
-    options: [
-      { id: 573, label: 'Albufeira' },
-      { id: 575, label: 'Almancil' },
-      { id: 577, label: 'Alvor' },
-      { id: 578, label: 'Armação de Pêra' },
-      { id: 2153, label: 'Bordeira' },
-      { id: 579, label: 'Carvoeiro' },
-      { id: 2245, label: 'Castelo (Albufeira)' },
-      { id: 1845, label: 'Castro Marim' },
-      { id: 1624, label: 'Estoi' },
-      { id: 2046, label: 'Faro' },
-      { id: 1835, label: 'Ferragudo' },
-      { id: 2246, label: 'Galé (Albufeira)' },
-      { id: 2247, label: 'Guia (Albufeira)' },
-      { id: 580, label: 'Lagos' },
-      { id: 581, label: 'Loulé' },
-      { id: 1846, label: 'Moncarapacho' },
-      { id: 1621, label: 'Monchique' },
-      { id: 582, label: 'Monte Gordo' },
-      { id: 1306, label: 'Olhão' },
-      { id: 583, label: 'Olhos d’Água (Albufeira)' },
-      { id: 586, label: 'Praia da Rocha' },
-      { id: 1291, label: 'Praia do Vau' },
-      { id: 2129, label: 'Praia Verde' },
-      { id: 587, label: 'Quarteira' },
-      { id: 588, label: 'Quinta do Lago' },
-      { id: 1590, label: 'Salema' },
-      { id: 1879, label: 'São Brás' },
-      { id: 2248, label: 'São Rafael (Albufeira)' },
-      { id: 589, label: 'Silves' },
-      { id: 590, label: 'Tavira' },
-      { id: 2249, label: 'Vale de Parra (Albufeira)' },
-      { id: 2093, label: 'Vila Nova de Cacela' },
-      { id: 592, label: 'Vilamoura' },
-    ],
-  },
-  {
-    group: 'Costa Verde',
-    options: [
-      { id: 2195, label: 'Barcelos' },
-      { id: 2192, label: 'Caminha' },
-      { id: 2194, label: 'Esposende' },
-      { id: 2193, label: 'Paredes de Coura' },
-      { id: 2197, label: 'Ponte de Lima' },
-      { id: 2196, label: 'Viana do Castelo' },
-    ],
-  },
-  {
-    group: 'Madeira',
-    options: [
-      { id: 1357, label: 'Calheta' },
-      { id: 1954, label: 'Câmara de Lobos' },
-      { id: 1400, label: 'Caniçal' },
-      { id: 534, label: 'Caniço' },
-      { id: 535, label: 'Funchal' },
-      { id: 537, label: 'Machico' },
-      { id: 2023, label: 'Madalena do Mar' },
-      { id: 1673, label: 'Ponta do Sol' },
-      { id: 2186, label: 'Porto Moniz' },
-      { id: 1880, label: 'Prazeres' },
-      { id: 539, label: 'Ribeira Brava' },
-      { id: 1330, label: 'Santa Cruz (Madeira)' },
-      { id: 1723, label: 'Santana' },
-      { id: 540, label: 'Santo da Serra' },
-      { id: 1724, label: 'São Vicente' },
-    ],
-  },
-];
+// Populated at boot from `${apiBase}/reference.json`. Each entry is either a
+// flat array of {id, label} options or an array of {group, options} groups
+// (rendered as <optgroup>).
+let STATIC_OPTIONS = {};
 
-// The cached endpoint matches `areas` against the hotel's area NAME (string),
-// so values are the names not the upstream numeric IDs (139/2191/129).
-const AREA_OPTIONS = [
-  { id: 'Algarve', label: 'Algarve' },
-  { id: 'Costa Verde', label: 'Costa Verde' },
-  { id: 'Madeira', label: 'Madeira' },
-];
-
-const BOARD_BASIS_OPTIONS = [
-  { id: 5, label: 'All Inclusive' },
-  { id: 8, label: 'All Inclusive Plus' },
-  { id: 1, label: 'Bed & Breakfast' },
-  { id: 3, label: 'Full Board' },
-  { id: 11, label: 'Full Board Plus' },
-  { id: 2, label: 'Half Board' },
-  { id: 10, label: 'Half Board Plus' },
-  { id: 6, label: 'Room Only' },
-  { id: 4, label: 'Self Catering' },
-];
-
-const ROOM_TYPE_OPTIONS = [
-  { id: 22, label: '1 Bedroom Suite' },
-  { id: 21, label: '2 Bedroom Suite' },
-  { id: 2, label: 'Double' },
-  { id: 13, label: 'Double/Twin' },
-  { id: 4, label: 'Family Room' },
-  { id: 23, label: 'Interconnecting Room' },
-  { id: 19, label: 'Junior Suite' },
-  { id: 5, label: 'One Bed Apt' },
-  { id: 20, label: 'Quad' },
-  { id: 1, label: 'Single' },
-  { id: 8, label: 'Studio' },
-  { id: 15, label: 'Superior' },
-  { id: 17, label: 'Townhouse' },
-  { id: 7, label: 'Triple' },
-  { id: 6, label: 'Two Bed Apt' },
-  { id: 16, label: 'Villa' },
-];
-
-const STAR_RATING_OPTIONS = [
-  { id: 2, label: '2 stars' },
-  { id: 3, label: '3 stars' },
-  { id: 4, label: '4 stars' },
-  { id: 5, label: '5 stars' },
-];
-
-const STATIC_OPTIONS = {
-  resorts: RESORT_OPTIONS,
-  predefinedResorts: RESORT_OPTIONS,
-  areas: AREA_OPTIONS,
-  boardBasisIds: BOARD_BASIS_OPTIONS,
-  roomTypeIds: ROOM_TYPE_OPTIONS,
-  starRatings: STAR_RATING_OPTIONS,
-};
+function resolveReference(ref) {
+  const out = {};
+  for (const [k, v] of Object.entries(ref)) {
+    if (v && typeof v === 'object' && !Array.isArray(v) && typeof v.$ref === 'string') {
+      out[k] = ref[v.$ref] ?? [];
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}
 
 const $ = (sel, root = document) => root.querySelector(sel);
 
@@ -269,16 +153,12 @@ function fieldFor(p) {
   return fs;
 }
 
-// Hand-tweaked labels for hotelOrder; everything else just shows the raw value.
-const HOTEL_ORDER_LABELS = {
-  1: '1 — Recommended',
-  2: '2 — Our rating high→low',
-  3: '3 — Our rating low→high',
-  4: '4 — TripAdvisor rating',
-};
-
 function enumLabel(name, value) {
-  if (name === 'hotelOrder' && HOTEL_ORDER_LABELS[value]) return HOTEL_ORDER_LABELS[value];
+  const ref = STATIC_OPTIONS[name];
+  if (Array.isArray(ref)) {
+    const match = ref.find((o) => !o.group && String(o.id) === String(value));
+    if (match) return `${value} — ${match.label}`;
+  }
   return String(value);
 }
 
@@ -345,6 +225,12 @@ async function loadSpec(apiBase) {
   const res = await fetch(`${apiBase.replace(/\/$/, '')}/openapi.yaml`);
   if (!res.ok) throw new Error(`Failed to load schema (${res.status})`);
   return jsYaml.load(await res.text());
+}
+
+async function loadReference(apiBase) {
+  const res = await fetch(`${apiBase.replace(/\/$/, '')}/reference.json`);
+  if (!res.ok) throw new Error(`Failed to load reference (${res.status})`);
+  return resolveReference(await res.json());
 }
 
 function render(spec, apiBase, context) {
@@ -434,7 +320,17 @@ function fail(apiBase, message, retry) {
   const apiBase = (startBase || localStorage.getItem(STORAGE_KEY) || DEFAULT_API_BASE).replace(/\/$/, '');
 
   try {
-    const spec = await loadSpec(apiBase);
+    const [spec, reference] = await Promise.all([
+      loadSpec(apiBase),
+      loadReference(apiBase).catch((err) => {
+        // Reference is nice-to-have — without it the fields fall back to
+        // free-text inputs. Don't fail the whole boot.
+        // eslint-disable-next-line no-console
+        console.warn('reference.json not loaded:', err);
+        return {};
+      }),
+    ]);
+    STATIC_OPTIONS = reference;
     render(spec, apiBase, context);
   } catch (err) {
     fail(apiBase, `Could not load OpenAPI schema from ${apiBase}/openapi.yaml — ${err.message}.`, init);

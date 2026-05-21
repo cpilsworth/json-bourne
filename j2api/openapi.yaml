@@ -88,6 +88,27 @@ paths:
                 $ref: '#/components/schemas/CachedHotelsResponse'
         '405': { $ref: '#/components/responses/MethodNotAllowed' }
 
+  /reference.json:
+    get:
+      operationId: getReferenceValues
+      summary: Reference values (IDs and labels) for the filter parameters
+      description: |
+        Static taxonomy lifted from the live jet2holidays.com
+        `/destinations/portugal` filter dialog. Useful for UIs that want to
+        present labelled dropdowns rather than raw numeric IDs.
+
+        `areas` uses the area NAME as the id because the cached endpoint
+        filters on the area string column, not the upstream numeric area id.
+        `predefinedResorts` is a `$ref` to `resorts` since the same option
+        set applies.
+      responses:
+        '200':
+          description: Reference taxonomy.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Reference'
+
   /html/jet2/hotels/getcachedhotels:
     get:
       operationId: getCachedHotelsHtml
@@ -294,6 +315,49 @@ components:
           type: integer
           description: Total hotels matching the filter (before pagination).
       required: [Hotels, HotelCountForSelectedFilters]
+
+    Option:
+      type: object
+      properties:
+        id: { oneOf: [{ type: integer }, { type: string }] }
+        label: { type: string }
+      required: [id, label]
+
+    OptionGroup:
+      type: object
+      properties:
+        group: { type: string }
+        options:
+          type: array
+          items: { $ref: '#/components/schemas/Option' }
+      required: [group, options]
+
+    Reference:
+      type: object
+      description: Reference taxonomy returned by `/reference.json`.
+      properties:
+        hotelOrder:
+          type: array
+          items: { $ref: '#/components/schemas/Option' }
+        starRatings:
+          type: array
+          items: { $ref: '#/components/schemas/Option' }
+        boardBasisIds:
+          type: array
+          items: { $ref: '#/components/schemas/Option' }
+        roomTypeIds:
+          type: array
+          items: { $ref: '#/components/schemas/Option' }
+        areas:
+          type: array
+          items: { $ref: '#/components/schemas/Option' }
+        resorts:
+          type: array
+          items: { $ref: '#/components/schemas/OptionGroup' }
+        predefinedResorts:
+          description: '`{ "$ref": "resorts" }` — same set as `resorts`.'
+          type: object
+          additionalProperties: true
 
     UpstreamHotelsResponse:
       description: |

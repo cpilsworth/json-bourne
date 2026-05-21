@@ -5,6 +5,7 @@
 
 import Mustache from 'mustache';
 import OPENAPI_YAML from '../openapi.yaml';
+import REFERENCE from '../reference.json';
 
 // Default Mustache escape encodes "/" as "&#x2F;" which mangles URLs in href/src.
 // Override to keep the XSS-relevant escapes and leave "/" alone.
@@ -92,6 +93,17 @@ export default {
         },
       });
     }
+    if (url.pathname === '/reference.json') {
+      // Inline so we don't import a stale build artefact — JSON.stringify is
+      // cheap on this size of payload.
+      return new Response(JSON.stringify(REFERENCE), {
+        headers: {
+          ...corsHeaders(origin),
+          'content-type': 'application/json; charset=utf-8',
+          'cache-control': 'public, max-age=300',
+        },
+      });
+    }
     return json({ error: 'Not found' }, 404, origin);
   },
 };
@@ -110,6 +122,7 @@ const FORM_HTML = `<!doctype html>
   label { font-size: 12px; opacity: 0.75; }
   input, select, textarea { font: inherit; padding: 4px 6px; }
   textarea { min-height: 50px; resize: vertical; font-family: ui-monospace, monospace; font-size: 12px; }
+  select[multiple] { min-height: 120px; padding: 4px; }
   .row-checkbox { flex-direction: row; align-items: center; gap: 6px; }
   .row-checkbox label { font-size: 14px; opacity: 1; }
   .submit { display: flex; gap: 8px; }
@@ -140,24 +153,32 @@ const FORM_HTML = `<!doctype html>
     <input id="pageSize" name="pageSize" type="number" min="1" max="200" value="10">
   </fieldset>
   <fieldset>
-    <label for="starRatings">starRatings (csv, e.g. 4,5)</label>
-    <input id="starRatings" name="starRatings" placeholder="">
+    <label for="starRatings">starRatings</label>
+    <input id="starRatings" name="starRatings" placeholder="loading…" data-ref="starRatings">
   </fieldset>
   <fieldset>
-    <label for="areas">areas (csv)</label>
-    <input id="areas" name="areas" placeholder="e.g. Algarve">
+    <label for="areas">areas</label>
+    <input id="areas" name="areas" placeholder="loading…" data-ref="areas">
   </fieldset>
   <fieldset>
-    <label for="resorts">resorts (csv)</label>
-    <input id="resorts" name="resorts">
+    <label for="boardBasisIds">boardBasisIds</label>
+    <input id="boardBasisIds" name="boardBasisIds" placeholder="loading…" data-ref="boardBasisIds">
+  </fieldset>
+  <fieldset>
+    <label for="roomTypeIds">roomTypeIds</label>
+    <input id="roomTypeIds" name="roomTypeIds" placeholder="loading…" data-ref="roomTypeIds">
+  </fieldset>
+  <fieldset>
+    <label for="resorts">resorts</label>
+    <input id="resorts" name="resorts" placeholder="loading…" data-ref="resorts">
   </fieldset>
   <fieldset class="row-checkbox">
     <input id="showVillasOnly" name="showVillasOnly" type="checkbox" value="True">
     <label for="showVillasOnly">showVillasOnly</label>
   </fieldset>
   <fieldset style="grid-column: 1 / -1;">
-    <label for="predefinedResorts">predefinedResorts (csv) — defaults to Algarve</label>
-    <textarea id="predefinedResorts" name="predefinedResorts">573,575,577,578,2153,579,2245,1845,1624,2046,1835,2246,2247,580,581,1846,1621,582,1306,583,586,1291,2129,587,588,1590,1879,2248,589,590,2249,2093,592</textarea>
+    <label for="predefinedResorts">predefinedResorts</label>
+    <input id="predefinedResorts" name="predefinedResorts" placeholder="loading…" data-ref="predefinedResorts">
   </fieldset>
   <div class="submit">
     <button type="submit">Load</button>
@@ -171,21 +192,80 @@ const FORM_HTML = `<!doctype html>
   const urlOut = document.getElementById('urlOut');
   const frame = document.getElementById('result');
   const ENDPOINT = '/api/jet2/hotels/getcachedhotels';
-  const ARRAY_FIELDS = ['areas','starRatings','resorts','predefinedResorts'];
+  const ARRAY_FIELDS = ['areas','starRatings','resorts','predefinedResorts','boardBasisIds','roomTypeIds'];
 
   function buildUrl() {
-    const data = new FormData(form);
     const params = new URLSearchParams();
-    for (const [k, v] of data.entries()) {
-      if (!v || v === '') continue;
-      if (ARRAY_FIELDS.includes(k)) {
-        v.split(',').map((s) => s.trim()).filter(Boolean).forEach((x) => params.append(k, x));
+    for (const control of form.querySelectorAll('[name]')) {
+      const name = control.name;
+      if (control.tagName === 'SELECT' && control.multiple) {
+        for (const opt of control.selectedOptions) params.append(name, opt.value);
+        continue;
+      }
+      if (control.type === 'checkbox') {
+        if (control.checked) params.set(name, control.value);
+        continue;
+      }
+      const v = (control.value || '').trim();
+      if (!v) continue;
+      if (ARRAY_FIELDS.includes(name)) {
+        v.split(',').map((s) => s.trim()).filter(Boolean).forEach((x) => params.append(name, x));
       } else {
-        params.set(k, v);
+        params.set(name, v);
       }
     }
     return ENDPOINT + (params.toString() ? '?' + params : '');
   }
+
+  // Swap any input[data-ref] for a multi-select populated from /reference.json.
+  async function loadReference() {
+    let ref;
+    try {
+      const res = await fetch('/reference.json');
+      if (!res.ok) return;
+      ref = await res.json();
+    } catch { return; }
+    // Resolve { "$ref": "key" } indirection (used by predefinedResorts).
+    for (const [k, v] of Object.entries(ref)) {
+      if (v && typeof v === 'object' && !Array.isArray(v) && typeof v.$ref === 'string') {
+        ref[k] = ref[v.$ref] ?? [];
+      }
+    }
+    for (const input of form.querySelectorAll('input[data-ref]')) {
+      const opts = ref[input.dataset.ref];
+      if (!Array.isArray(opts) || opts.length === 0) {
+        input.placeholder = 'comma-separated';
+        continue;
+      }
+      const select = document.createElement('select');
+      select.id = input.id;
+      select.name = input.name;
+      select.multiple = true;
+      const flat = opts.flatMap((o) => o.group ? o.options : [o]);
+      select.size = Math.min(flat.length, 8);
+      for (const o of opts) {
+        if (o.group) {
+          const og = document.createElement('optgroup');
+          og.label = o.group;
+          for (const sub of o.options) {
+            const opt = document.createElement('option');
+            opt.value = String(sub.id);
+            opt.textContent = sub.label;
+            og.append(opt);
+          }
+          select.append(og);
+        } else {
+          const opt = document.createElement('option');
+          opt.value = String(o.id);
+          opt.textContent = o.label;
+          select.append(opt);
+        }
+      }
+      input.replaceWith(select);
+    }
+    refreshUrl();
+  }
+  loadReference();
 
   function refreshUrl() {
     const u = buildUrl();
