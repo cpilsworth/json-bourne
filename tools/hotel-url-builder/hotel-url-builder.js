@@ -50,10 +50,30 @@ const AREA_OPTIONS = [
   { id: 'Algarve', label: 'Algarve' },
 ];
 
+// Board basis and room type IDs are platform-specific to Jet2 and aren't
+// captured in the cached seed (the scrape script sends empty arrays). Populate
+// these from the live filter UI on jet2holidays.com when available — the
+// proxy endpoint will pass the IDs through to upstream. The cached endpoint
+// ignores these filters (see openapi.yaml description).
+const BOARD_BASIS_OPTIONS = [
+  // TODO: { id: <number>, label: 'All Inclusive' },
+  // TODO: { id: <number>, label: 'Half Board' },
+  // …
+];
+
+const ROOM_TYPE_OPTIONS = [
+  // TODO: { id: <number>, label: 'Standard Room' },
+  // …
+];
+
 const STATIC_OPTIONS = {
   resorts: RESORT_OPTIONS,
   predefinedResorts: RESORT_OPTIONS,
   areas: AREA_OPTIONS,
+  // Only swap in the multi-select once the option lists are populated;
+  // otherwise the user can't type a value at all.
+  ...(BOARD_BASIS_OPTIONS.length ? { boardBasisIds: BOARD_BASIS_OPTIONS } : {}),
+  ...(ROOM_TYPE_OPTIONS.length ? { roomTypeIds: ROOM_TYPE_OPTIONS } : {}),
 };
 
 const $ = (sel, root = document) => root.querySelector(sel);
