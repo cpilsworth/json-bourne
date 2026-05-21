@@ -513,6 +513,8 @@ function corsHeaders(origin) {
     'access-control-allow-methods': 'GET, HEAD, OPTIONS',
     'access-control-allow-headers':
       'content-type, x-forwarded-cookie, x-forwarded-user-agent',
+    'access-control-expose-headers': 'x-j2api-upstream-status',
+    'access-control-max-age': '86400',
     vary: 'Origin',
   };
 }
