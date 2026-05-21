@@ -42,6 +42,10 @@ export async function loadFragment(path) {
 }
 
 export default async function decorate(block) {
+  if (block.dataset.ssr === 'inlined') {
+    block.replaceWith(...block.childNodes);
+    return;
+  }
   const link = block.querySelector('a');
   const path = link ? link.getAttribute('href') : block.textContent.trim();
   const fragment = await loadFragment(path);
