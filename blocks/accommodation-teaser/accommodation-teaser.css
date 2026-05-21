@@ -389,14 +389,14 @@
   text-align: left;
 }
 
-.accommodation-teaser.block .cards .card-map-btn .icon {
+.accommodation-teaser.block .cards .card-map-btn .icon-pin {
   width: var(--icon-size-md);
   height: var(--icon-size-md);
   display: flex;
   pointer-events: none;
 }
 
-.accommodation-teaser.block .cards .card-map-btn .icon svg {
+.accommodation-teaser.block .cards .card-map-btn .icon-pin svg {
   display: block;
   width: 100%;
   height: 100%;
