@@ -244,6 +244,16 @@
   padding: var(--badge-base-padding);
   border-radius: var(--badge-base-border-radius);
   font: var(--badge-md-text);
+  background: #1a1f3a;
+  color: #fff;
+}
+
+.accommodation-teaser.block .cards .cards-card-image .cards-card-badge.luxe {
+  background: #0a0a0a;
+}
+
+.accommodation-teaser.block .cards .cards-card-image .cards-card-badge.adults {
+  background: #d62b62;
 }
 
 .accommodation-teaser.block .cards .cards-card-image .shortlist-btn {
