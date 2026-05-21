@@ -379,10 +379,12 @@ function decorateHotel(h) {
   };
 }
 
-// Icons are inlined so the SSR output is self-contained — no sprite needed on the host page.
-// .icon class is intentionally omitted so AEM's decorateIcons doesn't append a 404'ing <img>.
-const ICON_PIN = `<span class="icon-pin"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" aria-hidden="true"><path d="M50 8a30 30 0 0 0-30 30c0 22.5 30 54 30 54s30-31.5 30-54A30 30 0 0 0 50 8zm0 42a12 12 0 1 1 0-24 12 12 0 0 1 0 24z"/></svg></span>`;
-const ICON_STAR = `<span class="icon-star-fill"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" aria-hidden="true"><path d="M10 1.5l2.7 5.5 6.1.9-4.4 4.3 1 6L10 15.4l-5.4 2.8 1-6L1.2 7.9l6.1-.9z"/></svg></span>`;
+// Icons are served from the host site's /icons folder. The AEM EDS
+// decorateIcons() runs over .icon spans and swaps them for <img> at
+// /icons/<name>.svg — so we emit that shape directly and stay compatible
+// whether or not decorateIcons runs on the injected fragment.
+const ICON_PIN = `<span class="icon icon-pin"><img data-icon-name="pin" src="/icons/pin.svg" alt="" loading="lazy"></span>`;
+const ICON_STAR = `<span class="icon icon-star-fill"><img data-icon-name="star-fill" src="/icons/star-fill.svg" alt="" loading="lazy"></span>`;
 
 const CARDS_TEMPLATE = `<div class="accommodation-teaser block" data-block-name="accommodation-teaser" data-block-status="initialized"><h2>{{Title}}</h2>{{#HasHotels}}<ul class="cards">{{#Hotels}}<li class="card" data-accommodation-id="{{Id}}"><div class="cards-card-image"><picture>{{#PictureSources}}<source media="{{media}}" srcset="{{srcset}}">{{/PictureSources}}<img loading="lazy" alt="" src="{{ImageDefault}}"></picture>{{#HasBrand}}<span class="cards-card-badge {{BrandClass}}">{{Brand}}</span>{{/HasBrand}}</div><div class="cards-card-body"><div class="cards-card-body-header"><h3><a href="{{Url}}" title="{{Name}}">{{Name}}</a></h3><button class="card-map-btn" aria-label="View {{Name}} on the map">${ICON_PIN}{{Resort}}, {{Area}}</button><div class="accommodation-ratings"><div class="accommodation-star-rating"><span class="star-ratings">{{#StarsFull}}${ICON_STAR}{{/StarsFull}}{{#StarsPlus}}<span class="star-ratings-plus" aria-hidden="true">plus</span>{{/StarsPlus}}<span class="sr-text">{{StarRating}} stars</span></span><p>Our rating</p></div>{{#HasReviews}}<div class="accommodation-rating"><img src="{{RatingImageUrl}}" alt="TripAdvisor rating: {{RatingValue}}"><p>{{NumberOfReviews}} reviews</p></div>{{/HasReviews}}</div></div>{{#HasKeySellingPoints}}<div class="cards-card-body-footer"><ul class="accommodation-features">{{#KeySellingPoints}}<li><p>{{.}}</p></li>{{/KeySellingPoints}}</ul></div>{{/HasKeySellingPoints}}</div></li>{{/Hotels}}</ul><a href="{{ShowAllLink}}" class="button">Show all ({{HotelCountForSelectedFilters}}) and filter options</a>{{/HasHotels}}{{^HasHotels}}<p class="accommodation-teaser-empty">No hotels match the selected filters.</p>{{/HasHotels}}</div>`;
 
