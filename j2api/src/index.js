@@ -2,6 +2,8 @@
 //   GET /api/jet2/hotels/getfilteredhotels  → proxies to Jet2holidays' POST endpoint
 //   GET /api/jet2/hotels/getcachedhotels    → answers from the local D1 cache (JSON)
 //   GET /html/jet2/hotels/getcachedhotels   → same as cached, but rendered to HTML
+//   GET /view/jet2/hotels/getcachedhotels   → decorated view JSON for json2html
+//   GET /templates/cards.mustache           → the Mustache template used above
 
 import Mustache from 'mustache';
 import OPENAPI_YAML from '../openapi.yaml';
@@ -79,6 +81,31 @@ export default {
     }
     if (url.pathname === '/html/jet2/hotels/getcachedhotels') {
       return handleCachedHtml(env, url, origin);
+    }
+    if (url.pathname === '/view/jet2/hotels/getcachedhotels') {
+      return handleCachedView(env, url, origin);
+    }
+    if (url.pathname.startsWith('/view/jet2/hotels/by-path/')) {
+      const tail = url.pathname.slice('/view/jet2/hotels/by-path/'.length);
+      return handleByPathView(env, url, origin, tail);
+    }
+    if (url.pathname === '/templates/cards.mustache') {
+      return new Response(CARDS_TEMPLATE, {
+        headers: {
+          ...corsHeaders(origin),
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'public, max-age=300',
+        },
+      });
+    }
+    if (url.pathname === '/templates/cards-page.mustache') {
+      return new Response(CARDS_PAGE_TEMPLATE, {
+        headers: {
+          ...corsHeaders(origin),
+          'content-type': 'text/plain; charset=utf-8',
+          'cache-control': 'public, max-age=300',
+        },
+      });
     }
     if (url.pathname === '/' || url.pathname === '/try') {
       return new Response(FORM_HTML, {
@@ -375,6 +402,89 @@ async function handleCached(env, url, origin) {
   }, 200, origin);
 }
 
+async function handleCachedView(env, url, origin) {
+  const data = await queryCached(env, url);
+  return json(buildTeaserView(data), 200, origin);
+}
+
+// Normalize a place name (or URL slug) to a comparable form:
+//   "Praia Da Rocha"   → "praia-da-rocha"
+//   "Olhos D'Agua (Albufeira)" → "olhos-dagua-albufeira"
+//   "Monte Gordo"      → "monte-gordo"
+function slugify(s) {
+  return String(s ?? '')
+    .normalize('NFKD')
+    .replace(/[̀-ͯ]/g, '')   // strip combining accents
+    .toLowerCase()
+    .replace(/['’`]/g, '')         // drop apostrophes outright (don't hyphenate)
+    .replace(/[^a-z0-9]+/g, '-')        // any other non-alnum → hyphen
+    .replace(/^-+|-+$/g, '');
+}
+
+async function handleByPathView(env, url, origin, tail) {
+  const segs = tail.split('/').map((s) => decodeURIComponent(s)).filter(Boolean);
+  if (segs.length === 0 || segs.length > 3) {
+    return json({ error: 'Path must be country[/region[/resort]]' }, 400, origin);
+  }
+  const [countrySlug, regionSlug, resortSlug] = segs;
+
+  // Filter by region (the "country") in SQL — small cardinality, indexed implicitly
+  // by data volume. Area and resort are filtered in JS by slug-equality so we can
+  // handle punctuation/spacing variants without per-row migrations.
+  const pageSize = clampPageSize(url.searchParams.get('pageSize'));
+  const page = Number.parseInt(url.searchParams.get('page') ?? '0', 10) || 0;
+  const offset = page * pageSize;
+
+  // Pull all rows in the country and filter in JS. ~hundreds of rows max.
+  const { results } = await env.DB.prepare(
+    'SELECT * FROM hotels WHERE LOWER(region) = ? OR ? = ""'
+  ).bind(countrySlug, countrySlug).all();
+
+  let rows = results.filter((r) => slugify(r.region) === countrySlug);
+  if (regionSlug) rows = rows.filter((r) => slugify(r.area) === regionSlug);
+  if (resortSlug) rows = rows.filter((r) => slugify(r.resort) === resortSlug);
+
+  const orderBy = buildOrderBy(url.searchParams.get('hotelOrder'));
+  // Apply sort in JS to match SQL ordering semantics.
+  rows = sortRows(rows, orderBy);
+
+  const total = rows.length;
+  const pageRows = rows.slice(offset, offset + pageSize);
+
+  const data = {
+    Hotels: pageRows.map(rowToHotel),
+    HotelCountForSelectedFilters: total,
+    Page: page,
+    PageSize: pageSize,
+  };
+  const view = buildTeaserView(data);
+  // Title reflects the most specific place in the path that produced results.
+  // Prefer matched stored names (proper capitalisation) over the slug.
+  const sample = pageRows[0];
+  if (sample) {
+    if (resortSlug) view.Title = `Hotels in ${sample.resort}, ${sample.area}`;
+    else if (regionSlug) view.Title = `Hotels in ${sample.area}`;
+    else view.Title = `Hotels in ${sample.region}`;
+  } else {
+    view.Title = `No hotels in ${segs.join(' / ')}`;
+  }
+  return json(view, 200, origin);
+}
+
+function sortRows(rows, orderBy) {
+  // orderBy is the SQL fragment from buildOrderBy(); map back to comparators.
+  const desc = (k) => (a, b) => (b[k] ?? 0) - (a[k] ?? 0);
+  const asc  = (k) => (a, b) => (a[k] ?? 0) - (b[k] ?? 0);
+  const reviews = desc('review_count');
+  const tiebreak = (primary) => (a, b) => primary(a, b) || reviews(a, b);
+  switch (orderBy) {
+    case 'ORDER BY h.star_rating DESC, h.review_count DESC': return [...rows].sort(tiebreak(desc('star_rating')));
+    case 'ORDER BY h.star_rating ASC, h.review_count DESC':  return [...rows].sort(tiebreak(asc('star_rating')));
+    case 'ORDER BY h.rating_value DESC, h.review_count DESC':return [...rows].sort(tiebreak(desc('rating_value')));
+    default: return [...rows].sort((a, b) => reviews(a, b) || desc('star_rating')(a, b));
+  }
+}
+
 async function handleCachedHtml(env, url, origin) {
   const data = await queryCached(env, url);
   const view = buildTeaserView(data);
@@ -466,7 +576,12 @@ function decorateHotel(h) {
 const ICON_PIN = `<span class="icon icon-pin"><img data-icon-name="pin" src="/icons/pin.svg" alt="" loading="lazy"></span>`;
 const ICON_STAR = `<span class="icon icon-star-fill"><img data-icon-name="star-fill" src="/icons/star-fill.svg" alt="" loading="lazy"></span>`;
 
-const CARDS_TEMPLATE = `<div class="accommodation-teaser block" data-block-name="accommodation-teaser" data-block-status="initialized"><h2>{{Title}}</h2>{{#HasHotels}}<ul class="cards">{{#Hotels}}<li class="card" data-accommodation-id="{{Id}}"><div class="cards-card-image"><picture>{{#PictureSources}}<source media="{{media}}" srcset="{{srcset}}">{{/PictureSources}}<img loading="lazy" alt="" src="{{ImageDefault}}"></picture>{{#HasBrand}}<span class="cards-card-badge {{BrandClass}}">{{Brand}}</span>{{/HasBrand}}</div><div class="cards-card-body"><div class="cards-card-body-header"><h3><a href="{{Url}}" title="{{Name}}">{{Name}}</a></h3><button class="card-map-btn" aria-label="View {{Name}} on the map">${ICON_PIN}{{Resort}}, {{Area}}</button><div class="accommodation-ratings"><div class="accommodation-star-rating"><span class="star-ratings">{{#StarsFull}}${ICON_STAR}{{/StarsFull}}{{#StarsPlus}}<span class="star-ratings-plus" aria-hidden="true">plus</span>{{/StarsPlus}}<span class="sr-text">{{StarRating}} stars</span></span><p>Our rating</p></div>{{#HasReviews}}<div class="accommodation-rating"><img src="{{RatingImageUrl}}" alt="TripAdvisor rating: {{RatingValue}}"><p>{{NumberOfReviews}} reviews</p></div>{{/HasReviews}}</div></div>{{#HasKeySellingPoints}}<div class="cards-card-body-footer"><ul class="accommodation-features">{{#KeySellingPoints}}<li><p>{{.}}</p></li>{{/KeySellingPoints}}</ul></div>{{/HasKeySellingPoints}}</div></li>{{/Hotels}}</ul><a href="{{ShowAllLink}}" class="button">Show all ({{HotelCountForSelectedFilters}}) and filter options</a>{{/HasHotels}}{{^HasHotels}}<p class="accommodation-teaser-empty">No hotels match the selected filters.</p>{{/HasHotels}}</div>`;
+// Page-wrapped variant for AEM Live's json2html overlay. helix-html2md needs
+// a full document with <main> for content extraction; the bare block template
+// is stripped down to nothing. Title becomes the page <h1>.
+const CARDS_PAGE_TEMPLATE = `<!doctype html><html><head><title>{{Title}}</title></head><body><header></header><main><div><h1>{{Title}}</h1><div class="accommodation-teaser block" data-block-name="accommodation-teaser" data-block-status="initialized">{{#HasHotels}}<ul class="cards">{{#Hotels}}<li class="card" data-accommodation-id="{{Id}}"><div class="cards-card-image"><picture>{{#PictureSources}}<source media="{{media}}" srcset="{{srcset}}">{{/PictureSources}}<img loading="lazy" alt="" src="{{ImageDefault}}"></picture>{{#HasBrand}}<span class="cards-card-badge {{BrandClass}}">{{Brand}}</span>{{/HasBrand}}</div><div class="cards-card-body"><div class="cards-card-body-header"><h3><a href="{{Url}}" title="{{Name}}">{{Name}}</a></h3><button class="card-map-btn" aria-label="View {{Name}} on the map">${ICON_PIN}{{Resort}}, {{Area}}</button><div class="accommodation-ratings"><div class="accommodation-star-rating"><span class="star-ratings">{{#StarsFull}}${ICON_STAR}{{/StarsFull}}{{#StarsPlus}}<span class="star-ratings-plus" aria-hidden="true">plus</span>{{/StarsPlus}}<span class="sr-text">{{StarRating}} stars</span></span><p>Our rating</p></div>{{#HasReviews}}<div class="accommodation-rating"><img src="{{RatingImageUrl}}" alt="TripAdvisor rating: {{RatingValue}}"><p>{{NumberOfReviews}} reviews</p></div>{{/HasReviews}}</div></div>{{#HasKeySellingPoints}}<div class="cards-card-body-footer"><ul class="accommodation-features">{{#KeySellingPoints}}<li><p>{{.}}</p></li>{{/KeySellingPoints}}</ul></div>{{/HasKeySellingPoints}}</div></li>{{/Hotels}}</ul>{{/HasHotels}}{{^HasHotels}}<p class="accommodation-teaser-empty">No hotels match the selected filters.</p>{{/HasHotels}}</div></div></main><footer></footer></body></html>`;
+
+const CARDS_TEMPLATE = `<div class="accommodation-teaser block" data-block-name="accommodation-teaser" data-block-status="initialized"><h2>{{Title}}</h2>{{#HasHotels}}<ul class="cards">{{#Hotels}}<li class="card" data-accommodation-id="{{Id}}"><div class="cards-card-image"><picture>{{#PictureSources}}<source media="{{media}}" srcset="{{srcset}}">{{/PictureSources}}<img loading="lazy" alt="" src="{{ImageDefault}}"></picture>{{#HasBrand}}<span class="cards-card-badge {{BrandClass}}">{{Brand}}</span>{{/HasBrand}}</div><div class="cards-card-body"><div class="cards-card-body-header"><h3><a href="{{Url}}" title="{{Name}}">{{Name}}</a></h3><button class="card-map-btn" aria-label="View {{Name}} on the map">${ICON_PIN}{{Resort}}, {{Area}}</button><div class="accommodation-ratings"><div class="accommodation-star-rating"><span class="star-ratings">{{#StarsFull}}${ICON_STAR}{{/StarsFull}}{{#StarsPlus}}<span class="star-ratings-plus" aria-hidden="true">plus</span>{{/StarsPlus}}<span class="sr-text">{{StarRating}} stars</span></span><p>Our rating</p></div>{{#HasReviews}}<div class="accommodation-rating"><img src="{{RatingImageUrl}}" alt="TripAdvisor rating: {{RatingValue}}"><p>{{NumberOfReviews}} reviews</p></div>{{/HasReviews}}</div></div>{{#HasKeySellingPoints}}<div class="cards-card-body-footer"><ul class="accommodation-features">{{#KeySellingPoints}}<li><p>{{.}}</p></li>{{/KeySellingPoints}}</ul></div>{{/HasKeySellingPoints}}</div></li>{{/Hotels}}</ul>{{/HasHotels}}{{^HasHotels}}<p class="accommodation-teaser-empty">No hotels match the selected filters.</p>{{/HasHotels}}</div>`;
 
 function clampPageSize(raw) {
   const n = Number.parseInt(raw ?? '', 10);
@@ -580,6 +695,9 @@ function json(payload, status = 200, origin) {
 // branch previews work too.
 const ALLOWED_ORIGIN_PATTERNS = [
   /^https:\/\/[a-z0-9-]+--j2-da-blocks--cpilsworth\.aem\.(live|page)$/i,
+  /^https:\/\/[a-z0-9-]+--json-bourne--cpilsworth\.aem\.(live|page)$/i,
+  // json2html worker fetches our endpoint and template server-to-server.
+  /^https:\/\/json2html\.adobeaem\.workers\.dev$/i,
   /^https:\/\/(?:[a-z0-9-]+\.)?da\.live$/i,
   /^http:\/\/localhost(?::\d+)?$/i,
 ];
