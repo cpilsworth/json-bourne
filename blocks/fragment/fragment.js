@@ -10,6 +10,7 @@ import {
 
 import {
   loadSections,
+  readBlockConfig,
 } from '../../scripts/aem.js';
 
 /**
@@ -41,13 +42,23 @@ export async function loadFragment(path) {
   return null;
 }
 
+function getChannelFromHost(host) {
+  return (host || '').split('.')[0].trim().toLowerCase();
+}
+
 export default async function decorate(block) {
   if (block.dataset.ssr === 'inlined') {
     block.replaceWith(...block.childNodes);
     return;
   }
+
+  const config = readBlockConfig(block);
+
   const link = block.querySelector('a');
-  const path = link ? link.getAttribute('href') : block.textContent.trim();
+  const defaultPath = link ? link.getAttribute('href') : block.textContent.trim();
+  const channel = getChannelFromHost(window.location.hostname);
+  const channelPath = typeof config[channel] === 'string' ? config[channel].trim() : '';
+  const path = channelPath || defaultPath;
   const fragment = await loadFragment(path);
   if (fragment) {
     const fragmentSection = fragment.querySelector(':scope .section');
