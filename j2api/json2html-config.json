@@ -1,8 +1,0 @@
-[
-  {
-    "path": "/hotels/",
-    "regex": "/(?<=\\/hotels\\/).+$/",
-    "endpoint": "https://j2api.cpilsworth.workers.dev/view/jet2/hotels/by-path/{{id}}",
-    "template": "https://j2api.cpilsworth.workers.dev/templates/cards-page.mustache"
-  }
-]
