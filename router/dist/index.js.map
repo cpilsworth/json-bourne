@@ -1,0 +1,8 @@
+{
+  "version": 3,
+  "sources": ["../src/index.js"],
+  "sourceRoot": "dist",
+  "sourcesContent": ["const ORIGIN = 'https://main--j2retail--cpilsworth.aem.live';\n\nexport default {\n  async fetch(request) {\n    const url = new URL(request.url);\n    const isTrade = url.hostname === 'trade.diffatech.co.uk';\n    const isRetail = url.hostname === 'retail.diffatech.co.uk';\n\n    if (!isTrade && !isRetail) {\n      return new Response('Not Found', { status: 404 });\n    }\n\n    if (isRetail && /^\\/trade(\\/|$)/i.test(url.pathname)) {\n      return new Response('Not Found', { status: 404 });\n    }\n\n    const upstreamUrl = ORIGIN + url.pathname + url.search;\n    const upstreamRequest = new Request(upstreamUrl, request);\n    upstreamRequest.headers.set('host', new URL(ORIGIN).host);\n\n    return fetch(upstreamRequest, { redirect: 'manual' });\n  },\n};\n"],
+  "mappings": ";AAAA,IAAM,SAAS;AAEf,IAAO,gBAAQ;AAAA,EACb,MAAM,MAAM,SAAS;AACnB,UAAM,MAAM,IAAI,IAAI,QAAQ,GAAG;AAC/B,UAAM,UAAU,IAAI,aAAa;AACjC,UAAM,WAAW,IAAI,aAAa;AAElC,QAAI,CAAC,WAAW,CAAC,UAAU;AACzB,aAAO,IAAI,SAAS,aAAa,EAAE,QAAQ,IAAI,CAAC;AAAA,IAClD;AAEA,QAAI,YAAY,kBAAkB,KAAK,IAAI,QAAQ,GAAG;AACpD,aAAO,IAAI,SAAS,aAAa,EAAE,QAAQ,IAAI,CAAC;AAAA,IAClD;AAEA,UAAM,cAAc,SAAS,IAAI,WAAW,IAAI;AAChD,UAAM,kBAAkB,IAAI,QAAQ,aAAa,OAAO;AACxD,oBAAgB,QAAQ,IAAI,QAAQ,IAAI,IAAI,MAAM,EAAE,IAAI;AAExD,WAAO,MAAM,iBAAiB,EAAE,UAAU,SAAS,CAAC;AAAA,EACtD;AACF;",
+  "names": []
+}

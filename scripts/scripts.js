@@ -182,6 +182,27 @@ async function loadLazy(doc) {
 
   loadCSS(`${window.hlx.codeBasePath}/styles/lazy-styles.css`);
   loadFonts();
+
+  const loadQuickEdit = async (...args) => {
+    // eslint-disable-next-line import/no-cycle
+    const { default: initQuickEdit } = await import('../tools/quick-edit/quick-edit.js');
+    initQuickEdit(...args);
+  };
+
+  const addSidekickListeners = (sk) => {
+    sk.addEventListener('custom:quick-edit', loadQuickEdit);
+  };
+
+  const sk = document.querySelector('aem-sidekick');
+  if (sk) {
+    addSidekickListeners(sk);
+  } else {
+    // wait for sidekick to be loaded
+    document.addEventListener('sidekick-ready', () => {
+      // sidekick now loaded
+      addSidekickListeners(document.querySelector('aem-sidekick'));
+    }, { once: true });
+  }
 }
 
 /**
@@ -204,7 +225,7 @@ async function loadSidekick() {
   });
 }
 
-async function loadPage() {
+export async function loadPage() {
   await loadEager(document);
   await loadLazy(document);
   loadDelayed();
@@ -234,3 +255,8 @@ export const NX_ORIGIN = branch === 'local' || origin.includes('localhost') ? 'h
     import(`${NX_ORIGIN}/public/plugins/exp/exp.js`);
   }
 }());
+
+(() => {
+  const hasQE = new URL(window.location.href).searchParams.has('quick-edit');
+  if (hasQE) import('../tools/quick-edit/quick-edit.js').then((mod) => mod.default());
+})();

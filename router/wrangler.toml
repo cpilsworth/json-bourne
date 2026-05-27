@@ -1,0 +1,8 @@
+name = "diffatech-router"
+main = "src/index.js"
+compatibility_date = "2025-05-01"
+
+routes = [
+  { pattern = "retail.diffatech.co.uk/*", zone_name = "diffatech.co.uk" },
+  { pattern = "trade.diffatech.co.uk/*", zone_name = "diffatech.co.uk" },
+]
