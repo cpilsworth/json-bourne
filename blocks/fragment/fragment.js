@@ -60,6 +60,7 @@ function getChannelFromHost(config, host) {
 export default async function decorate(block) {
   const config = readBlockConfig(block);
   const channel = getChannelFromHost(config, window.location.hostname);
+  console.log(`Fragment block channel: ${channel}`);
   const channelPath = typeof config[channel] === 'string' ? config[channel].trim() : '';
 
   if (block.dataset.ssr === 'inlined' && !channelPath) {
