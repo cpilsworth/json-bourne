@@ -56,12 +56,115 @@ function autolinkModals(doc) {
 }
 
 /**
+ * Restructures hotel listing lists (rendered as default-content <ul>s by the
+ * json2html hotels template) into styleable cards. Runs for both the standalone
+ * /hotels/* pages and when embedded via the fragment block, since both call
+ * decorateMain -> buildAutoBlocks. decorateIcons has already turned the icon
+ * spans into <img>, so those elements are preserved as-is.
+ * @param {Element} main The container element
+ */
+function buildHotelCards(main) {
+  const isHotelList = (ul) => {
+    const li = ul.querySelector(':scope > li');
+    return li
+      && li.querySelector(':scope > p picture')
+      && li.querySelector(':scope > h3')
+      && li.querySelector(':scope .icon-pin');
+  };
+
+  main.querySelectorAll('ul').forEach((ul) => {
+    if (ul.classList.contains('hotel-cards') || !isHotelList(ul)) return;
+
+    ul.querySelectorAll(':scope > li').forEach((li) => {
+      const kids = [...li.children];
+      const isTa = (p) => /tripadvisor/i.test(p.querySelector('img')?.alt || '');
+      const pics = kids.filter((k) => k.tagName === 'P' && k.querySelector('picture'));
+      const imageP = pics.find((p) => !isTa(p));
+      const taP = pics.find(isTa);
+      const heading = li.querySelector(':scope > h3');
+      const locationP = kids.find((k) => k.tagName === 'P' && k.querySelector('.icon-pin'));
+      const starsP = kids.find((k) => k.tagName === 'P' && k.querySelector('.icon-star-fill'));
+      const featuresUl = li.querySelector(':scope > ul');
+      const textPs = kids.filter((k) => k.tagName === 'P'
+        && ![imageP, taP, locationP, starsP].includes(k));
+      const reviewsP = textPs.find((p) => /review/i.test(p.textContent));
+      const ratingP = textPs.find((p) => p !== reviewsP && /rating/i.test(p.textContent));
+      const badgeP = textPs.find((p) => ![reviewsP, ratingP].includes(p));
+
+      const imageWrap = document.createElement('div');
+      imageWrap.className = 'hotel-card-image';
+      if (imageP) imageWrap.append(imageP.querySelector('picture'));
+      if (badgeP && badgeP.textContent.trim()) {
+        const badge = document.createElement('span');
+        badge.className = 'hotel-card-badge';
+        badge.textContent = badgeP.textContent.trim();
+        imageWrap.append(badge);
+      }
+      const fav = document.createElement('span');
+      fav.className = 'hotel-card-fav';
+      fav.setAttribute('aria-hidden', 'true');
+      imageWrap.append(fav);
+
+      const body = document.createElement('div');
+      body.className = 'hotel-card-body';
+      if (heading) body.append(heading);
+      if (locationP) {
+        locationP.className = 'hotel-card-location';
+        body.append(locationP);
+      }
+
+      if (starsP || taP) {
+        const ratings = document.createElement('div');
+        ratings.className = 'hotel-card-ratings';
+        if (starsP) {
+          const ratingRow = document.createElement('div');
+          ratingRow.className = 'hotel-card-rating';
+          const stars = document.createElement('span');
+          stars.className = 'hotel-card-stars';
+          starsP.querySelectorAll('.icon-star-fill').forEach((s) => stars.append(s));
+          ratingRow.append(stars);
+          if (ratingP && ratingP.textContent.trim()) {
+            const lbl = document.createElement('span');
+            lbl.textContent = ratingP.textContent.trim();
+            ratingRow.append(lbl);
+          }
+          ratings.append(ratingRow);
+        }
+        if (taP) {
+          const reviewsRow = document.createElement('div');
+          reviewsRow.className = 'hotel-card-reviews';
+          reviewsRow.append(taP.querySelector('picture'));
+          if (reviewsP && reviewsP.textContent.trim()) {
+            const cnt = document.createElement('span');
+            cnt.textContent = reviewsP.textContent.trim();
+            reviewsRow.append(cnt);
+          }
+          ratings.append(reviewsRow);
+        }
+        body.append(ratings);
+      }
+
+      if (featuresUl) {
+        featuresUl.className = 'hotel-card-features';
+        body.append(featuresUl);
+      }
+
+      li.replaceChildren(imageWrap, body);
+    });
+
+    ul.classList.add('hotel-cards');
+    loadCSS(`${window.hlx.codeBasePath}/blocks/hotel-cards/hotel-cards.css`);
+  });
+}
+
+/**
  * Builds all synthetic blocks in a container element.
  * @param {Element} main The container element
  */
 function buildAutoBlocks(main) {
   try {
     if (!main.querySelector('.hero')) buildHeroBlock(main);
+    buildHotelCards(main);
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Auto Blocking failed', error);
