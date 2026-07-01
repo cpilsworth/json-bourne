@@ -1,0 +1,107 @@
+.things-to-do-filter {
+  margin-bottom: 24px;
+}
+
+.things-to-do-filter div {
+  display: inline-block;
+  margin-right: 8px;
+}
+
+.things-to-do-filter-select {
+  box-sizing: border-box;
+  width: auto;
+  min-width: 200px;
+  margin: 0;
+  padding: 0.5em;
+  border-radius: 4px;
+  border: 1px solid var(--dark-color);
+  background-color: var(--background-color);
+  color: var(--text-color);
+  font-family: var(--body-font-family);
+  font-size: var(--body-font-size-xs);
+}
+
+.things-to-do ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 24px;
+}
+
+.things-to-do ul > li {
+  overflow: hidden;
+  border: 1px solid #dadada;
+  border-radius: 12px;
+  background-color: var(--background-color);
+}
+
+.things-to-do .cards-card-image {
+  position: relative;
+  line-height: 0;
+}
+
+.things-to-do .cards-card-image img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+}
+
+.things-to-do .cards-card-badge {
+  position: absolute;
+  top: 12px;
+  left: 12px;
+  margin: 0;
+  border-radius: 999px;
+  padding: 6px 16px;
+  background-color: var(--background-color);
+  color: var(--link-color);
+  font-size: var(--body-font-size-xs);
+  font-weight: 600;
+}
+
+.things-to-do .cards-card-body {
+  padding: 16px 20px 20px;
+}
+
+.things-to-do .cards-card-body h3 {
+  margin: 0;
+  font-size: var(--heading-font-size-xs);
+}
+
+.things-to-do .cards-card-body h3 a {
+  color: var(--link-color);
+}
+
+.things-to-do .cards-card-location {
+  margin: 8px 0;
+  color: var(--dark-color);
+  font-size: var(--body-font-size-xs);
+}
+
+/* show only the first 6 cards until "show more" is toggled */
+.things-to-do-toggle-input {
+  display: none;
+}
+
+.things-to-do ul > li:nth-child(n+7) {
+  display: none;
+}
+
+.things-to-do-toggle-input:checked ~ ul > li:nth-child(n+7) {
+  display: block;
+}
+
+.things-to-do-toggle-label {
+  display: block;
+  margin-top: 24px;
+  color: var(--link-color);
+  text-align: center;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.things-to-do-toggle-input:checked ~ .things-to-do-toggle-label {
+  display: none;
+}

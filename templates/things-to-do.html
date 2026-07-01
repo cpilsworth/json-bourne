@@ -1,0 +1,31 @@
+<title>Things to do</title>
+
+<main>
+  <div>
+    <div class="things-to-do">
+      <div class="things-to-do-filter">
+        <div>All</div>
+        {{#categories}}
+        <div>{{name}}</div>
+        {{/categories}}
+      </div>
+      <input type="checkbox" id="things-to-do-toggle" class="things-to-do-toggle-input">
+      <ul>
+        {{#pois}}
+        <li data-category="{{category}}">
+          <div class="cards-card-image">
+            <p class="cards-card-badge">{{category}}</p>
+            <picture><img src="{{images.thumbnail}}" alt="{{{title}}}" loading="lazy"></picture>
+          </div>
+          <div class="cards-card-body">
+            <h3><a href="https://www.jet2holidays.com{{url}}">{{{title}}}</a></h3>
+            <p class="cards-card-location">📍 {{location.description}}</p>
+            <p>{{{summary}}}</p>
+          </div>
+        </li>
+        {{/pois}}
+      </ul>
+      <label for="things-to-do-toggle" class="things-to-do-toggle-label">Show more things to do</label>
+    </div>
+  </div>
+</main>
