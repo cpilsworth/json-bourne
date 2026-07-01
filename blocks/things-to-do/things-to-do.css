@@ -1,17 +1,8 @@
-.things-to-do-filter {
-  margin-bottom: 24px;
-}
-
-.things-to-do-filter div {
-  display: inline-block;
-  margin-right: 8px;
-}
-
-.things-to-do-filter-select {
+.things-to-do .things-to-do-filter {
   box-sizing: border-box;
   width: auto;
-  min-width: 200px;
-  margin: 0;
+  min-width: 220px;
+  margin: 0 0 24px;
   padding: 0.5em;
   border-radius: 4px;
   border: 1px solid var(--dark-color);
@@ -31,77 +22,83 @@
 }
 
 .things-to-do ul > li {
+  display: flex;
+  flex-direction: column;
   overflow: hidden;
   border: 1px solid #dadada;
   border-radius: 12px;
   background-color: var(--background-color);
 }
 
-.things-to-do .cards-card-image {
+.things-to-do ul > li[hidden] {
+  display: none;
+}
+
+.things-to-do .things-to-do-card-image {
   position: relative;
   line-height: 0;
 }
 
-.things-to-do .cards-card-image img {
+.things-to-do .things-to-do-card-image picture,
+.things-to-do .things-to-do-card-image img {
+  display: block;
   width: 100%;
+}
+
+.things-to-do .things-to-do-card-image img {
   aspect-ratio: 4 / 3;
   object-fit: cover;
 }
 
-.things-to-do .cards-card-badge {
+.things-to-do .things-to-do-card-badge {
   position: absolute;
   top: 12px;
   left: 12px;
-  margin: 0;
   border-radius: 999px;
   padding: 6px 16px;
   background-color: var(--background-color);
   color: var(--link-color);
   font-size: var(--body-font-size-xs);
   font-weight: 600;
+  line-height: normal;
 }
 
-.things-to-do .cards-card-body {
+.things-to-do .things-to-do-card-body {
   padding: 16px 20px 20px;
 }
 
-.things-to-do .cards-card-body h3 {
+.things-to-do .things-to-do-card-body h3 {
   margin: 0;
   font-size: var(--heading-font-size-xs);
 }
 
-.things-to-do .cards-card-body h3 a {
+.things-to-do .things-to-do-card-body h3 a {
   color: var(--link-color);
+  text-decoration: none;
 }
 
-.things-to-do .cards-card-location {
+.things-to-do .things-to-do-card-body h3 a:hover {
+  text-decoration: underline;
+}
+
+.things-to-do .things-to-do-card-location {
   margin: 8px 0;
   color: var(--dark-color);
   font-size: var(--body-font-size-xs);
 }
 
-/* show only the first 6 cards until "show more" is toggled */
-.things-to-do-toggle-input {
-  display: none;
-}
-
-.things-to-do ul > li:nth-child(n+7) {
-  display: none;
-}
-
-.things-to-do-toggle-input:checked ~ ul > li:nth-child(n+7) {
+.things-to-do .things-to-do-more {
   display: block;
-}
-
-.things-to-do-toggle-label {
-  display: block;
-  margin-top: 24px;
+  margin: 24px auto 0;
+  border: none;
+  padding: 0;
+  background: none;
   color: var(--link-color);
-  text-align: center;
+  font-size: var(--body-font-size-s);
   text-decoration: underline;
   cursor: pointer;
 }
 
-.things-to-do-toggle-input:checked ~ .things-to-do-toggle-label {
+.things-to-do .things-to-do-more[hidden] {
   display: none;
 }
