@@ -56,38 +56,12 @@ function autolinkModals(doc) {
 }
 
 /**
- * Promotes hotel listing lists to the `hotel-cards` block. The listing arrives
- * as a default-content <ul> (json2html hotels template output, flattened by
- * html2md); wrapping it as a block lets the standard block loader run
- * blocks/hotel-cards. All card-specific logic lives in that block.
- * @param {Element} main The container element
- */
-function buildHotelCardsBlocks(main) {
-  const isHotelList = (ul) => {
-    const li = ul.querySelector(':scope > li');
-    return li
-      && li.querySelector(':scope > p picture')
-      && li.querySelector(':scope > h3')
-      && li.querySelector(':scope .icon-pin');
-  };
-
-  main.querySelectorAll('ul').forEach((ul) => {
-    if (ul.closest('.hotel-cards') || !isHotelList(ul)) return;
-    const next = ul.nextSibling;
-    const parent = ul.parentNode;
-    const block = buildBlock('hotel-cards', { elems: [ul] });
-    parent.insertBefore(block, next);
-  });
-}
-
-/**
  * Builds all synthetic blocks in a container element.
  * @param {Element} main The container element
  */
 function buildAutoBlocks(main) {
   try {
     if (!main.querySelector('.hero')) buildHeroBlock(main);
-    buildHotelCardsBlocks(main);
   } catch (error) {
     // eslint-disable-next-line no-console
     console.error('Auto Blocking failed', error);

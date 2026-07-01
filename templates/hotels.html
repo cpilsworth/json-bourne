@@ -1,0 +1,25 @@
+<title>{{Title}}</title>
+
+<main>
+  <div>
+    <h1>{{Title}}</h1>
+    <div class="hotel-cards">
+      {{#Hotels}}
+      <div>
+        <div>{{#HasBrand}}{{Brand}}{{/HasBrand}}</div>
+        <div>
+          <picture>
+            {{#PictureSources}}<source media="{{media}}" srcset="{{srcset}}">{{/PictureSources}}
+            <img loading="lazy" alt="{{Name}}" src="{{ImageDefault}}">
+          </picture>
+        </div>
+        <div><a href="{{Url}}" title="{{Name}}">{{Name}}</a></div>
+        <div>{{Resort}}, {{Area}}</div>
+        <div>{{StarRating}}{{#StarsPlus}} plus{{/StarsPlus}} stars</div>
+        <div>{{#HasReviews}}<img src="{{RatingImageUrl}}" alt="TripAdvisor rating: {{RatingValue}}"> {{NumberOfReviews}} reviews{{/HasReviews}}</div>
+        <div>{{#HasKeySellingPoints}}{{#KeySellingPoints}}<p>{{.}}</p>{{/KeySellingPoints}}{{/HasKeySellingPoints}}</div>
+      </div>
+      {{/Hotels}}
+    </div>
+  </div>
+</main>
