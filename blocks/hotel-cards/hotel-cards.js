@@ -1,39 +1,53 @@
 /*
  * Hotel Cards block
- * The hotel listing arrives as a default-content <ul> (the json2html hotels
- * template output, flattened to standard HTML by html2md). scripts.js promotes
- * that <ul> to a `hotel-cards` block; this decorator restructures each <li>
- * into a Jet2-style card. decorateIcons has already turned the icon spans into
- * <img>, so those elements are preserved as-is.
+ * Rendered from the json2html hotels template (templates/hotels.html) as a
+ * block-table: one row per hotel with fixed cells
+ *   [0] brand/badge  [1] image  [2] name link  [3] location
+ *   [4] star rating text  [5] TripAdvisor rating + review count  [6] features
+ * Block-internal classes don't survive html2md, so cells are read by position.
+ * Star/pin icons are created here and coloured via CSS mask (no <img> needed).
  */
-export default function decorate(block) {
-  const ul = block.querySelector('ul');
-  if (!ul) return;
+function buildStars(text) {
+  const stars = document.createElement('span');
+  stars.className = 'hotel-card-stars';
+  const count = parseInt((text.match(/\d+/) || [0])[0], 10);
+  for (let i = 0; i < count; i += 1) {
+    const s = document.createElement('span');
+    s.className = 'icon-star-fill';
+    stars.append(s);
+  }
+  if (/plus/i.test(text)) {
+    const plus = document.createElement('span');
+    plus.className = 'hotel-card-stars-plus';
+    plus.textContent = 'plus';
+    stars.append(plus);
+  }
+  return stars;
+}
 
-  ul.querySelectorAll(':scope > li').forEach((li) => {
-    const kids = [...li.children];
-    const isTa = (p) => /tripadvisor/i.test(p.querySelector('img')?.alt || '');
-    const pics = kids.filter((k) => k.tagName === 'P' && k.querySelector('picture'));
-    const imageP = pics.find((p) => !isTa(p));
-    const taP = pics.find(isTa);
-    const heading = li.querySelector(':scope > h3');
-    const locationP = kids.find((k) => k.tagName === 'P' && k.querySelector('.icon-pin'));
-    const starsP = kids.find((k) => k.tagName === 'P' && k.querySelector('.icon-star-fill'));
-    const featuresUl = li.querySelector(':scope > ul');
-    const textPs = kids.filter((k) => k.tagName === 'P'
-      && ![imageP, taP, locationP, starsP].includes(k));
-    const reviewsP = textPs.find((p) => /review/i.test(p.textContent));
-    const ratingP = textPs.find((p) => p !== reviewsP && /rating/i.test(p.textContent));
-    const badgeP = textPs.find((p) => ![reviewsP, ratingP].includes(p));
+export default function decorate(block) {
+  const ul = document.createElement('ul');
+
+  block.querySelectorAll(':scope > div').forEach((row) => {
+    const cells = [...row.children];
+    const badge = cells[0] ? cells[0].textContent.trim() : '';
+    const picture = cells[1] ? cells[1].querySelector('picture') : null;
+    const link = cells[2] ? cells[2].querySelector('a') : null;
+    const location = cells[3] ? cells[3].textContent.trim() : '';
+    const starsText = cells[4] ? cells[4].textContent.trim() : '';
+    const reviewsCell = cells[5];
+    const featuresCell = cells[6];
+
+    const li = document.createElement('li');
 
     const imageWrap = document.createElement('div');
     imageWrap.className = 'hotel-card-image';
-    if (imageP) imageWrap.append(imageP.querySelector('picture'));
-    if (badgeP && badgeP.textContent.trim()) {
-      const badge = document.createElement('span');
-      badge.className = 'hotel-card-badge';
-      badge.textContent = badgeP.textContent.trim();
-      imageWrap.append(badge);
+    if (picture) imageWrap.append(picture);
+    if (badge) {
+      const badgeEl = document.createElement('span');
+      badgeEl.className = 'hotel-card-badge';
+      badgeEl.textContent = badge;
+      imageWrap.append(badgeEl);
     }
     const fav = document.createElement('span');
     fav.className = 'hotel-card-fav';
@@ -42,36 +56,46 @@ export default function decorate(block) {
 
     const body = document.createElement('div');
     body.className = 'hotel-card-body';
-    if (heading) body.append(heading);
-    if (locationP) {
-      locationP.className = 'hotel-card-location';
-      body.append(locationP);
+
+    const heading = document.createElement('h3');
+    if (link) {
+      const a = document.createElement('a');
+      a.href = link.getAttribute('href');
+      a.textContent = link.textContent.trim();
+      heading.append(a);
+    }
+    body.append(heading);
+
+    if (location) {
+      const loc = document.createElement('p');
+      loc.className = 'hotel-card-location';
+      const pin = document.createElement('span');
+      pin.className = 'icon-pin';
+      loc.append(pin, document.createTextNode(location));
+      body.append(loc);
     }
 
-    if (starsP || taP) {
+    const taPicture = reviewsCell ? reviewsCell.querySelector('picture') : null;
+    if (starsText || taPicture) {
       const ratings = document.createElement('div');
       ratings.className = 'hotel-card-ratings';
-      if (starsP) {
+      if (starsText) {
         const ratingRow = document.createElement('div');
         ratingRow.className = 'hotel-card-rating';
-        const stars = document.createElement('span');
-        stars.className = 'hotel-card-stars';
-        starsP.querySelectorAll('.icon-star-fill').forEach((s) => stars.append(s));
-        ratingRow.append(stars);
-        if (ratingP && ratingP.textContent.trim()) {
-          const lbl = document.createElement('span');
-          lbl.textContent = ratingP.textContent.trim();
-          ratingRow.append(lbl);
-        }
+        ratingRow.append(buildStars(starsText));
+        const lbl = document.createElement('span');
+        lbl.textContent = 'Our rating';
+        ratingRow.append(lbl);
         ratings.append(ratingRow);
       }
-      if (taP) {
+      if (taPicture) {
         const reviewsRow = document.createElement('div');
         reviewsRow.className = 'hotel-card-reviews';
-        reviewsRow.append(taP.querySelector('picture'));
-        if (reviewsP && reviewsP.textContent.trim()) {
+        reviewsRow.append(taPicture);
+        const count = reviewsCell.textContent.trim();
+        if (count) {
           const cnt = document.createElement('span');
-          cnt.textContent = reviewsP.textContent.trim();
+          cnt.textContent = count;
           reviewsRow.append(cnt);
         }
         ratings.append(reviewsRow);
@@ -79,14 +103,21 @@ export default function decorate(block) {
       body.append(ratings);
     }
 
-    if (featuresUl) {
-      featuresUl.className = 'hotel-card-features';
-      body.append(featuresUl);
+    const featureItems = featuresCell ? [...featuresCell.querySelectorAll('p')] : [];
+    if (featureItems.length) {
+      const features = document.createElement('ul');
+      features.className = 'hotel-card-features';
+      featureItems.forEach((p) => {
+        const item = document.createElement('li');
+        item.textContent = p.textContent.trim();
+        features.append(item);
+      });
+      body.append(features);
     }
 
-    li.replaceChildren(imageWrap, body);
+    li.append(imageWrap, body);
+    ul.append(li);
   });
 
-  // Drop the buildBlock table wrapper so the block directly contains the list.
   block.replaceChildren(ul);
 }
