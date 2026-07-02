@@ -1,0 +1,34 @@
+<!--
+  Minimal block-table template example for the json2html-fragment-block skill.
+  Renders an EDS spreadsheet (rows keyed by a slug, columns = fields) as a
+  `<block-name>` block-table: one <div> row per item, one <div> cell per datum.
+  Fixed cell order so the block JS can read cells[0], cells[1], ... by position.
+  Keep it logic-less: emit raw values; compute the view (bar heights, icons) in
+  blocks/<block-name>/<block-name>.js.
+-->
+<title>Local weather</title>
+
+<main>
+  <div>
+    <h2>Local weather</h2>
+    <div class="local-weather">
+      {{#data}}
+      <div>
+        <div>{{Resort}}</div>
+        <div>{{Jan}}</div>
+        <div>{{Feb}}</div>
+        <div>{{Mar}}</div>
+        <div>{{Apr}}</div>
+        <div>{{May}}</div>
+        <div>{{Jun}}</div>
+        <div>{{Jul}}</div>
+        <div>{{Aug}}</div>
+        <div>{{Sep}}</div>
+        <div>{{Oct}}</div>
+        <div>{{Nov}}</div>
+        <div>{{Dec}}</div>
+      </div>
+      {{/data}}
+    </div>
+  </div>
+</main>
