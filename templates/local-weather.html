@@ -1,8 +1,26 @@
-<title>weather probe2</title>
+<title>Local weather</title>
 
 <main>
   <div>
-    <div>ID={{id}}</div>
-    <div>ROWS={{#data}}{{Resort}}:{{Jan}} {{/data}}</div>
+    <h2>Local weather</h2>
+    <div class="local-weather">
+      {{#data}}
+      <div>
+        <div>{{Resort}}</div>
+        <div>{{Jan}}</div>
+        <div>{{Feb}}</div>
+        <div>{{Mar}}</div>
+        <div>{{Apr}}</div>
+        <div>{{May}}</div>
+        <div>{{Jun}}</div>
+        <div>{{Jul}}</div>
+        <div>{{Aug}}</div>
+        <div>{{Sep}}</div>
+        <div>{{Oct}}</div>
+        <div>{{Nov}}</div>
+        <div>{{Dec}}</div>
+      </div>
+      {{/data}}
+    </div>
   </div>
 </main>
